@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Attendance - Smart Attendance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .result-panel {
+            margin-top: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        .result-panel h3 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        .student-card {
+            display: inline-block;
+            text-align: left;
+            background: rgba(0,0,0,0.2);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            margin-top: 1rem;
+        }
+        .student-card p {
+            margin: 0.5rem 0;
+            font-size: 0.95rem;
+        }
+        .unknown-action {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="index.html" class="logo">Smart Attendance</a>
+        <div class="nav-links">
+            <a href="index.html">Login</a>
+            <a href="register.html">Student Registration</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <h2>Live AI Attendance</h2>
+            <p style="color: var(--text-secondary)">Please look at the camera to mark your attendance</p>
+        </div>
+        
+        <div id="toast-container"></div>
+
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+            <div class="camera-overlay" id="status_overlay">Initializing camera...</div>
+        </div>
+        
+        <div class="glass-panel result-panel" id="result_panel" style="display: none; max-width: 640px; margin: 1.5rem auto;">
+            <h3 id="res_title">Student Recognized</h3>
+            
+            <div class="student-card" id="student_details">
+                <p><strong>Name:</strong> <span id="res_name">John Doe</span></p>
+                <p><strong>USN:</strong> <span id="res_usn" style="color: var(--text-secondary)">1SK22AI001</span></p>
+                <p><strong>Confidence:</strong> <span id="res_conf" style="color: var(--success-color)">98%</span></p>
+                <p><strong>Time:</strong> <span id="res_time">09:00 AM</span></p>
+                <div class="status present" style="display: inline-block; margin-top: 0.5rem;" id="res_status">Attendance Saved</div>
+            </div>
+            
+            <div id="unknown_action" class="unknown-action" style="display: none;">
+                <p style="margin-bottom: 1rem; color: var(--error-color);">New face detected. Please register first.</p>
+                <button class="glass-btn" onclick="window.location.href='register.html'">Register New Student</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('status_overlay');
+        const resultPanel = document.getElementById('result_panel');
+        const studentDetails = document.getElementById('student_details');
+        const unknownAction = document.getElementById('unknown_action');
+        let stream = null;
+        let isProcessing = false;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                overlay.textContent = "Looking for faces...";
+                
+                // Start processing frames
+                setInterval(processFrame, 2000);
+            } catch(err) {
+                overlay.textContent = "Camera access denied or unavailable";
+                console.error("Camera error:", err);
+            }
+        }
+
+        function formatTime() {
+            return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+
+        async function processFrame() {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('image', blob, 'frame.jpg');
+                
+                try {
+                    const response = await fetch(`${API_BASE}/attendance/mark_auto`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if(data.status === 'success') {
+                        document.getElementById('res_title').textContent = "Student Recognized";
+                        document.getElementById('res_title').style.color = "var(--success-color)";
+                        document.getElementById('res_name').textContent = data.student.name;
+                        document.getElementById('res_usn').textContent = data.student.usn;
+                        document.getElementById('res_conf').textContent = data.student.confidence;
+                        document.getElementById('res_time').textContent = formatTime();
+                        document.getElementById('res_status').textContent = data.message;
+                        
+                        studentDetails.style.display = 'inline-block';
+                        unknownAction.style.display = 'none';
+                        resultPanel.style.display = 'block';
+                        
+                        showToast(data.message, "success");
+                        setTimeout(() => resultPanel.style.display = 'none', 4000);
+                        
+                    } else if(data.status === 'unknown') {
+                        document.getElementById('res_title').textContent = "Unknown Face";
+                        document.getElementById('res_title').style.color = "var(--error-color)";
+                        
+                        studentDetails.style.display = 'none';
+                        unknownAction.style.display = 'block';
+                        resultPanel.style.display = 'block';
+                        
+                        showToast("New face detected", "error");
+                        setTimeout(() => resultPanel.style.display = 'none', 6000);
+                    }
+                } catch(err) {
+                    // Ignore network errors quietly so we don't spam the UI
+                } finally {
+                    isProcessing = false;
+                }
+            }, 'image/jpeg');
+        }
+
+        window.onload = startCamera;
+    </script>
+</body>
+</html>

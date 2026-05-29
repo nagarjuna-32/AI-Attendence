@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Smart Attendance</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        @media (max-width: 768px) {
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .alert-card {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="dashboard.html" class="logo">Smart Attendance</a>
+        <div class="nav-links">
+            <a href="dashboard.html" class="active">Dashboard</a>
+            <a href="manual.html">Manual Marking</a>
+            <a href="#" onclick="exportReport()">Export CSV</a>
+            <a href="#" onclick="logout()">Logout</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2 style="margin-bottom: 1.5rem;">Admin Dashboard</h2>
+        
+        <div id="unknown_alert" class="alert-card" style="display: none;">
+            <div>
+                <h4 style="color: var(--error-color); margin-bottom: 0.25rem;">Security Alert</h4>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;" id="unknown_text">0 unknown faces detected recently.</p>
+            </div>
+            <button class="glass-btn" style="width: auto; background: var(--error-color);" onclick="window.location.href='register.html'">Register Them</button>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="glass-panel stat-card">
+                <h3>Total Students</h3>
+                <div class="value" id="total_students">-</div>
+            </div>
+            <div class="glass-panel stat-card">
+                <h3>Present Today</h3>
+                <div class="value" id="present" style="color: var(--success-color)">-</div>
+            </div>
+            <div class="glass-panel stat-card">
+                <h3>Late</h3>
+                <div class="value" id="late" style="color: var(--warning-color)">-</div>
+            </div>
+            <div class="glass-panel stat-card">
+                <h3>Absent Today</h3>
+                <div class="value" id="absent" style="color: var(--error-color)">-</div>
+            </div>
+            <div class="glass-panel stat-card">
+                <h3>Attendance %</h3>
+                <div class="value" id="percentage">-</div>
+            </div>
+        </div>
+
+        <div class="charts-container">
+            <div class="glass-panel">
+                <h3 style="margin-bottom: 1rem;">Today's Overview</h3>
+                <div class="chart-wrapper">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+            <div class="glass-panel">
+                <h3 style="margin-bottom: 1rem;">Weekly Trend</h3>
+                <div class="chart-wrapper">
+                    <canvas id="barChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-panel">
+            <h3 style="margin-bottom: 1rem;">Recent Activity</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student Name</th>
+                        <th>USN</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Method</th>
+                    </tr>
+                </thead>
+                <tbody id="logs_table">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        Chart.defaults.color = '#cbd5e1';
+        Chart.defaults.font.family = 'Inter';
+
+        async function loadStats() {
+            try {
+                const response = await fetchWithAuth('/dashboard/stats');
+                if(!response) return;
+                const data = await response.json();
+                
+                document.getElementById('total_students').innerText = data.total_students;
+                document.getElementById('present').innerText = data.present;
+                document.getElementById('late').innerText = data.late;
+                document.getElementById('absent').innerText = data.absent;
+                document.getElementById('percentage').innerText = data.percentage + '%';
+                
+                if (data.unknown_faces_count > 0) {
+                    document.getElementById('unknown_alert').style.display = 'flex';
+                    document.getElementById('unknown_text').innerText = `${data.unknown_faces_count} unknown face(s) detected. Ensure no intruders.`;
+                }
+                
+                renderCharts(data.chart_pie, data.chart_bar);
+                
+                const tbody = document.getElementById('logs_table');
+                tbody.innerHTML = '';
+                
+                data.recent_logs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    let statusClass = log.status.toLowerCase();
+                    tr.innerHTML = `
+                        <td>${log.student_name}</td>
+                        <td>${log.usn}</td>
+                        <td>${log.time}</td>
+                        <td><span class="status ${statusClass}">${log.status}</span></td>
+                        <td>${log.method}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch(e) {
+                console.error("Error loading stats:", e);
+            }
+        }
+
+        function renderCharts(pieData, barData) {
+            new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: pieData.labels,
+                    datasets: [{
+                        data: pieData.data,
+                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: barData.labels,
+                    datasets: [{
+                        label: 'Present Students',
+                        data: barData.data,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 4
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+        
+        async function exportReport() {
+            try {
+                const response = await fetchWithAuth('/reports/csv');
+                if(!response) return;
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "attendance_report.csv";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch(e) {
+                showToast("Failed to export report", "error");
+            }
+        }
+
+        window.onload = loadStats;
+    </script>
+</body>
+</html>
