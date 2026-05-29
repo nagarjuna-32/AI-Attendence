@@ -111,3 +111,65 @@ def get_risk_predictions(db: Session = Depends(get_db), current_user = Depends(d
     predictions.sort(key=lambda x: (risk_order.get(x["risk_level"], 3), -x["probability"]))
     
     return predictions
+
+@router.get("/heatmaps/{student_id}")
+def get_student_heatmap(student_id: int, db: Session = Depends(get_db)):
+    # Generate a 30-day mock/real heatmap for the student
+    today = date.today()
+    start_date = today - timedelta(days=30)
+    
+    attendances = db.query(models.Attendance).filter(
+        models.Attendance.student_id == student_id,
+        models.Attendance.date >= start_date
+    ).all()
+    
+    # Map dates to status
+    status_map = {a.date.isoformat(): a.status for a in attendances}
+    
+    heatmap_data = []
+    for i in range(30):
+        d = start_date + timedelta(days=i)
+        d_str = d.isoformat()
+        status = status_map.get(d_str, "Unmarked")
+        
+        # Assign color severity
+        color = "bg-slate-800" # Unmarked
+        if status == "Present": color = "bg-emerald-500"
+        elif status == "Late": color = "bg-amber-500"
+        elif status == "Absent": color = "bg-rose-500"
+        
+        heatmap_data.append({
+            "date": d_str,
+            "status": status,
+            "color": color
+        })
+        
+    return heatmap_data
+
+@router.get("/recommendations/{student_id}")
+def get_student_recommendations(student_id: int, db: Session = Depends(get_db)):
+    # Calculate classes needed to reach 75%
+    total_classes = 40 # arbitrary for now, usually derived from Subject total sessions
+    attendances = db.query(models.Attendance).filter(models.Attendance.student_id == student_id).all()
+    
+    attended = sum(1 for a in attendances if a.status in ["Present", "Late"])
+    missed = sum(1 for a in attendances if a.status == "Absent")
+    current_total = attended + missed
+    
+    if current_total == 0:
+        return {"message": "Great start! Keep attending classes to maintain 100%."}
+        
+    current_pct = (attended / current_total) * 100
+    
+    if current_pct >= 75:
+        # Buffer calculation
+        buffer = 0
+        while ((attended) / (current_total + buffer + 1)) * 100 >= 75:
+            buffer += 1
+        return {"message": f"You are safe. You can afford to miss {buffer} classes."}
+    else:
+        # Needed calculation
+        needed = 0
+        while ((attended + needed) / (current_total + needed)) * 100 < 75:
+            needed += 1
+        return {"message": f"Warning! You must attend the next {needed} classes continuously to reach 75%."}

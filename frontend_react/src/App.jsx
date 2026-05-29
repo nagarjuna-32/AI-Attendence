@@ -1,8 +1,24 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Registration from './pages/Registration';
-import Dashboard from './pages/Dashboard';
+
+// Portals
+import AdminDashboard from './pages/admin/AdminDashboard';
+import PrincipalDashboard from './pages/principal/PrincipalDashboard';
+import HODDashboard from './pages/hod/HODDashboard';
+import FacultyDashboard from './pages/faculty/FacultyDashboard';
+import BulkScanner from './pages/faculty/BulkScanner';
+import StudentDashboard from './pages/student/StudentDashboard';
 import ManualAttendance from './pages/ManualAttendance';
+
+// Ensure standard authentication wrapper (simulated for now based on role localstorage)
+const ProtectedRoute = ({ children, role }) => {
+  const currentRole = localStorage.getItem('role');
+  if (!currentRole || currentRole !== role) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+};
 
 function App() {
   return (
@@ -10,8 +26,38 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/register" element={<Registration />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/manual" element={<ManualAttendance />} />
+        
+        {/* Admin Portal (Legacy/Technical) */}
+        <Route path="/admin" element={
+          <ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>
+        } />
+        
+        {/* Principal Portal */}
+        <Route path="/principal" element={
+          <ProtectedRoute role="principal"><PrincipalDashboard /></ProtectedRoute>
+        } />
+        
+        {/* HOD Portal */}
+        <Route path="/hod" element={
+          <ProtectedRoute role="hod"><HODDashboard /></ProtectedRoute>
+        } />
+
+        {/* Faculty Portal */}
+        <Route path="/faculty" element={
+          <ProtectedRoute role="faculty"><FacultyDashboard /></ProtectedRoute>
+        } />
+        <Route path="/faculty/scanner" element={
+          <ProtectedRoute role="faculty"><BulkScanner /></ProtectedRoute>
+        } />
+        <Route path="/faculty/manual" element={
+          <ProtectedRoute role="faculty"><ManualAttendance /></ProtectedRoute>
+        } />
+
+        {/* Student Portal */}
+        <Route path="/student" element={
+          <ProtectedRoute role="student"><StudentDashboard /></ProtectedRoute>
+        } />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

@@ -49,31 +49,35 @@ export default function Login() {
           animate={{ opacity: 1, y: 0 }}
           className="glass-panel max-w-md w-full"
         >
-          <h2 className="text-3xl font-bold mb-6 text-center">Admin Login</h2>
-          {error && <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">{error}</div>}
+          <h2 className="text-3xl font-bold mb-6 text-center">Principal Login</h2>
+          {error && <div className="bg-red-500/20 text-red-300 p-3 rounded mb-4 text-sm">{error}</div>}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
+              <label className="block text-slate-400 mb-1 text-sm">Username</label>
               <input 
                 type="text" 
-                placeholder="Username" 
-                className="glass-input" 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
                 required
               />
             </div>
             <div>
+              <label className="block text-slate-400 mb-1 text-sm">Password</label>
               <input 
                 type="password" 
-                placeholder="Password" 
-                className="glass-input" 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-cyan-500"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
               />
             </div>
-            <button type="submit" disabled={loading} className="glass-btn">
-              {loading ? 'Authenticating...' : 'Sign In as Admin'}
+            <button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold py-3 rounded-lg mt-6"
+              disabled={loading}
+            >
+              {loading ? 'Authenticating...' : 'Sign In as Principal'}
             </button>
           </form>
 

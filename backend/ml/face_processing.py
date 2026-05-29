@@ -30,18 +30,29 @@ def get_face_recognizer():
     )
     return recognizer
 
-def check_blur(image, threshold=100.0):
-    """Returns True if image is blurry (variance of Laplacian < threshold)"""
+def calculate_face_quality(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # Blur score
     fm = cv2.Laplacian(gray, cv2.CV_64F).var()
-    return fm < threshold
+    blur_score = min(100.0, max(0.0, fm / 5.0)) # Maps variance of 500 to 100%
+    
+    # Brightness score
+    mean_val = cv2.mean(gray)[0]
+    brightness_score = max(0.0, 100.0 - abs(mean_val - 127.0) / 127.0 * 100.0)
+    
+    # Combined score
+    quality_score = (blur_score * 0.7) + (brightness_score * 0.3)
+    return quality_score
 
 def extract_face_feature(image):
     """
     Detects a single face in the image and extracts its 128-d feature vector.
-    Returns (feature_vector, error_message)
+    Returns (feature_vector, quality_score, error_message)
     """
     try:
+        quality_score = calculate_face_quality(image)
+        
         height, width, _ = image.shape
         detector = get_face_detector((width, height))
         recognizer = get_face_recognizer()
@@ -49,18 +60,43 @@ def extract_face_feature(image):
         # Detect faces
         faces = detector.detect(image)
         if faces[1] is None:
-            return None, "No face detected"
+            return None, quality_score, "No face detected"
             
         if len(faces[1]) > 1:
-            return None, "Multiple faces detected. Please ensure only one face is in the frame."
+            return None, quality_score, "Multiple faces detected. Please ensure only one face is in the frame."
             
         # Align face and extract feature
         face = faces[1][0]
         aligned_face = recognizer.alignCrop(image, face)
         feature = recognizer.feature(aligned_face)
-        return feature[0], None
+        return feature[0], quality_score, None
     except Exception as e:
-        return None, str(e)
+        return None, 0.0, str(e)
+
+def extract_multiple_face_features(image):
+    """
+    Detects multiple faces in the image and extracts their features.
+    Returns (list_of_features, error_message)
+    """
+    try:
+        height, width, _ = image.shape
+        detector = get_face_detector((width, height))
+        recognizer = get_face_recognizer()
+        
+        faces = detector.detect(image)
+        if faces[1] is None:
+            return [], "No faces detected"
+            
+        features = []
+        for face in faces[1]:
+            aligned_face = recognizer.alignCrop(image, face)
+            feature = recognizer.feature(aligned_face)
+            features.append(feature[0])
+            
+        return features, None
+    except Exception as e:
+        return [], str(e)
+
 
 def match_face(feature1, feature2, threshold=0.363): # cosine distance threshold for SFace
     """

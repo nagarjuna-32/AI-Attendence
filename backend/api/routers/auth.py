@@ -10,25 +10,43 @@ from backend.core.config import settings
 
 router = APIRouter()
 
-@router.post("/login", response_model=schemas.Token)
+@router.post("/login")
 def login_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()):
-    # Check Admin
-    admin = db.query(models.Admin).filter(models.Admin.username == form_data.username).first()
-    if admin and security.verify_password(form_data.password, admin.password_hash):
+    # Check Principal
+    principal = db.query(models.Principal).filter(models.Principal.username == form_data.username).first()
+    if principal and security.verify_password(form_data.password, principal.password_hash):
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = security.create_access_token(
-            data={"username": admin.username, "role": "admin"}, expires_delta=access_token_expires
+            data={"username": principal.username, "role": "principal", "id": principal.id}, expires_delta=access_token_expires
         )
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {"access_token": access_token, "token_type": "bearer", "role": "principal", "id": principal.id}
+
+    # Check HOD
+    hod = db.query(models.HOD).filter(models.HOD.username == form_data.username).first()
+    if hod and security.verify_password(form_data.password, hod.password_hash):
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = security.create_access_token(
+            data={"username": hod.username, "role": "hod", "id": hod.id}, expires_delta=access_token_expires
+        )
+        return {"access_token": access_token, "token_type": "bearer", "role": "hod", "id": hod.id}
         
-    # Check Teacher
-    teacher = db.query(models.Teacher).filter(models.Teacher.username == form_data.username).first()
-    if teacher and security.verify_password(form_data.password, teacher.password_hash):
+    # Check Faculty
+    faculty = db.query(models.Faculty).filter(models.Faculty.username == form_data.username).first()
+    if faculty and security.verify_password(form_data.password, faculty.password_hash):
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = security.create_access_token(
-            data={"username": teacher.username, "role": "teacher"}, expires_delta=access_token_expires
+            data={"username": faculty.username, "role": "faculty", "id": faculty.id}, expires_delta=access_token_expires
         )
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {"access_token": access_token, "token_type": "bearer", "role": "faculty"}
+        
+    # Check Student
+    student = db.query(models.Student).filter(models.Student.username == form_data.username).first()
+    if student and security.verify_password(form_data.password, student.password_hash):
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = security.create_access_token(
+            data={"username": student.username, "role": "student", "id": student.id}, expires_delta=access_token_expires
+        )
+        return {"access_token": access_token, "token_type": "bearer", "role": "student"}
         
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -36,28 +54,3 @@ def login_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordR
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-@router.post("/register/teacher", response_model=schemas.UserResponse)
-def register_teacher(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(models.Teacher).filter(models.Teacher.username == user.username).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    
-    hashed_password = security.get_password_hash(user.password)
-    db_user = models.Teacher(username=user.username, password_hash=hashed_password, full_name=user.full_name, department=user.department)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
-
-@router.post("/register/admin", response_model=schemas.UserResponse)
-def register_admin(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(models.Admin).filter(models.Admin.username == user.username).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    
-    hashed_password = security.get_password_hash(user.password)
-    db_user = models.Admin(username=user.username, password_hash=hashed_password)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user

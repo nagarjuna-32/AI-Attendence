@@ -52,9 +52,17 @@ export default function ManualAttendance() {
       
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <div className="glass-panel">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl flex items-center gap-4 mb-8">
+            <div className="w-16 h-16 bg-cyan-500/20 rounded-xl flex items-center justify-center border border-cyan-500/50 text-cyan-400">
+                <CheckCircle2 size={32} />
+            </div>
+            <div>
+            <h1 className="text-2xl font-bold">Faculty Portal: Manual Attendance</h1>
+            <p className="text-slate-400">Manage attendance directly for recognized subjects</p>
+            </div>
+          </div>
+          
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <h1 className="text-2xl font-bold">Teacher Portal: Manual Attendance</h1>
-            
             <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 

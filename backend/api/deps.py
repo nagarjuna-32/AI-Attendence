@@ -27,10 +27,14 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise credentials_exception
         
     user = None
-    if token_data.role == "admin":
-        user = db.query(models.Admin).filter(models.Admin.username == token_data.username).first()
-    elif token_data.role == "teacher":
-        user = db.query(models.Teacher).filter(models.Teacher.username == token_data.username).first()
+    if token_data.role == "principal" or token_data.role == "admin":
+        user = db.query(models.Principal).filter(models.Principal.username == token_data.username).first()
+    elif token_data.role == "hod":
+        user = db.query(models.HOD).filter(models.HOD.username == token_data.username).first()
+    elif token_data.role == "faculty" or token_data.role == "teacher":
+        user = db.query(models.Faculty).filter(models.Faculty.username == token_data.username).first()
+    elif token_data.role == "student":
+        user = db.query(models.Student).filter(models.Student.username == token_data.username).first()
         
     if user is None:
         raise credentials_exception
@@ -40,6 +44,6 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     return user
 
 def get_current_active_admin(current_user = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if current_user.role not in ["principal", "admin"]:
         raise HTTPException(status_code=403, detail="Not enough permissions")
     return current_user

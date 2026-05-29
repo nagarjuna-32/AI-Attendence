@@ -14,6 +14,9 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [alert, setAlert] = useState(null); 
   const [showLogin, setShowLogin] = useState(false);
+  const [isScanningActive, setIsScanningActive] = useState(false);
+  
+  const [loginTarget, setLoginTarget] = useState('dashboard'); // 'dashboard' or 'manual'
   
   // Login State
   const [username, setUsername] = useState('');
@@ -23,34 +26,140 @@ export default function Home() {
   
   const navigate = useNavigate();
 
+  const stateRef = useRef('IDLE');
+  const challengeRef = useRef('');
+  const [challengeText, setChallengeText] = useState('Awaiting manual start...');
+  const blinkCountRef = useRef(0);
+  const isBlinkingRef = useRef(false);
+
+  const calculateEAR = (landmarks, leftIndices, rightIndices) => {
+    const d = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    const getEAR = (indices) => (
+      d(landmarks[indices[1]], landmarks[indices[5]]) + 
+      d(landmarks[indices[2]], landmarks[indices[4]])
+    ) / (2.0 * d(landmarks[indices[0]], landmarks[indices[3]]));
+    return (getEAR(leftIndices) + getEAR(rightIndices)) / 2.0;
+  };
+
+  const calculateMAR = (landmarks) => {
+    const d = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    const vert = d(landmarks[13], landmarks[14]); // inner lips
+    const horiz = d(landmarks[78], landmarks[308]); // corners
+    return vert / (horiz + 1e-6);
+  };
+
   useEffect(() => {
-    const initCamera = async () => {
+    if (!isScanningActive || showLogin) return;
+    
+    let cameraInstance = null;
+
+    const initFaceMesh = async () => {
+      const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
+      faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      
+      faceMesh.onResults((results) => {
+        if (stateRef.current === 'PROCESSING') return;
+
+        if (results.multiFaceLandmarks?.length > 0) {
+          if (results.multiFaceLandmarks.length > 1) {
+            setChallengeText("Multiple faces detected! Please ensure only YOU are in the frame.");
+            return;
+          }
+          
+          const landmarks = results.multiFaceLandmarks[0];
+          
+          const nose = landmarks[1];
+          const leftCheek = landmarks[234];
+          const rightCheek = landmarks[454];
+          const yaw = (nose.x - leftCheek.x) / (rightCheek.x - leftCheek.x); // ~0.5 is center
+
+          if (stateRef.current === 'IDLE') {
+            const challenges = ['BLINK_ONCE', 'BLINK_TWICE', 'TURN_LEFT', 'TURN_RIGHT', 'LOOK_STRAIGHT', 'SMILE'];
+            challengeRef.current = challenges[Math.floor(Math.random() * challenges.length)];
+            stateRef.current = 'CHALLENGE';
+            blinkCountRef.current = 0;
+            isBlinkingRef.current = false;
+          }
+          
+          if (stateRef.current === 'CHALLENGE') {
+            const ear = calculateEAR(landmarks, [33, 160, 158, 133, 153, 144], [362, 385, 387, 263, 373, 380]);
+            const mar = calculateMAR(landmarks);
+
+            // Track blinks globally for blink challenges
+            if (ear < 0.20 && !isBlinkingRef.current) {
+              isBlinkingRef.current = true;
+            } else if (ear > 0.25 && isBlinkingRef.current) {
+              isBlinkingRef.current = false;
+              blinkCountRef.current += 1;
+            }
+
+            if (challengeRef.current === 'BLINK_ONCE') {
+              setChallengeText("Security Check: Please BLINK ONCE.");
+              if (blinkCountRef.current >= 1) proceedToCapture();
+            }
+            else if (challengeRef.current === 'BLINK_TWICE') {
+              setChallengeText(`Security Check: Please BLINK TWICE. (${blinkCountRef.current}/2)`);
+              if (blinkCountRef.current >= 2) proceedToCapture();
+            }
+            else if (challengeRef.current === 'TURN_LEFT') {
+              setChallengeText("Security Check: Turn your head slightly LEFT.");
+              if (yaw < 0.35) proceedToCapture();
+            }
+            else if (challengeRef.current === 'TURN_RIGHT') {
+              setChallengeText("Security Check: Turn your head slightly RIGHT.");
+              if (yaw > 0.65) proceedToCapture();
+            }
+            else if (challengeRef.current === 'LOOK_STRAIGHT') {
+              setChallengeText("Security Check: Look perfectly STRAIGHT.");
+              if (yaw > 0.45 && yaw < 0.55) proceedToCapture();
+            }
+            else if (challengeRef.current === 'SMILE') {
+              setChallengeText("Security Check: Please SMILE.");
+              if (mar > 0.15) proceedToCapture(); // threshold for smiling
+            }
+          }
+        } else {
+          setChallengeText("No face detected. Please look at the camera.");
+          stateRef.current = 'IDLE';
+        }
+      });
+
       try {
         const s = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
         setStream(s);
         if (videoRef.current) {
           videoRef.current.srcObject = s;
+          cameraInstance = new window.Camera(videoRef.current, {
+            onFrame: async () => {
+              if (videoRef.current && stateRef.current !== 'PROCESSING') {
+                await faceMesh.send({image: videoRef.current});
+              }
+            },
+            width: 1280, height: 720
+          });
+          cameraInstance.start();
         }
-        setStatus('Scanning for student faces...');
       } catch (err) {
-        setStatus('Camera access denied or unavailable.');
+        setChallengeText('Camera access denied or unavailable.');
       }
     };
-    initCamera();
-
-    const interval = setInterval(processFrame, 1500);
+    
+    initFaceMesh();
 
     return () => {
-      clearInterval(interval);
-      if (stream) {
-        stream.getTracks().forEach(t => t.stop());
-      }
+      if (cameraInstance) cameraInstance.stop();
+      if (stream) stream.getTracks().forEach(t => t.stop());
     };
-  }, []);
+  }, [isScanningActive, showLogin]);
 
-  const processFrame = async () => {
-    // Pause scanning if login modal is open
-    if (showLogin || isProcessing || !videoRef.current || videoRef.current.readyState < 2) return;
+  const proceedToCapture = () => {
+    stateRef.current = 'PROCESSING';
+    setChallengeText("Liveness Verified! Authenticating...");
+    captureAndSend();
+  };
+
+  const captureAndSend = async () => {
+    if (!videoRef.current) return;
     setIsProcessing(true);
 
     const canvas = canvasRef.current;
@@ -72,7 +181,7 @@ export default function Home() {
         const data = await res.json();
         
         if (data.status === 'success') {
-          setAlert({ type: 'success', msg: `Welcome back, ${data.student.name}!` });
+          setAlert({ type: 'success', msg: data.message || `Welcome back, ${data.student.name}!` });
           setHistory(prev => [{
             time: new Date().toLocaleTimeString(),
             name: data.student.name,
@@ -81,21 +190,41 @@ export default function Home() {
             status: 'Recognized'
           }, ...prev].slice(0, 5));
           
-          setTimeout(() => setAlert(null), 4000);
-        } else if (data.status === 'unknown') {
-          setAlert({ type: 'error', msg: 'New Face Detected! Redirecting to Registration...' });
-          // Auto-redirect to registration for unknown students
           setTimeout(() => {
-            if (stream) stream.getTracks().forEach(t => t.stop());
+            setAlert(null);
+            setIsScanningActive(false); // Stop scan after success
+          }, 4000);
+        } else if (data.status === 'unknown') {
+          setAlert({ type: 'error', msg: 'Face Not Registered! Redirecting...' });
+          setTimeout(() => {
+            setIsScanningActive(false);
             navigate('/register');
           }, 3000);
+        } else {
+          // Error like outside timetable slot
+          setAlert({ type: 'error', msg: data.detail || 'Attendance Failed' });
+          setTimeout(() => {
+            setAlert(null);
+            stateRef.current = 'IDLE'; // Retry
+            setIsProcessing(false);
+          }, 4000);
+          return; // Early return to not trigger finally yet
         }
       } catch (err) {
-        // Silent fail on network error for scanner
+        setChallengeText("Network Error.");
       } finally {
-        setIsProcessing(false);
+        // Only reset if we didn't early return on error
+        if (stateRef.current === 'PROCESSING') {
+           setIsProcessing(false);
+           stateRef.current = 'IDLE';
+        }
       }
     }, 'image/jpeg');
+  };
+
+  const openLogin = (target) => {
+    setLoginTarget(target);
+    setShowLogin(true);
   };
 
   const handleLogin = async (e) => {
@@ -116,8 +245,15 @@ export default function Home() {
       
       if (res.ok) {
         localStorage.setItem('token', data.access_token);
+        localStorage.setItem('role', data.role);
+        if (data.id) localStorage.setItem('user_id', data.id);
         if (stream) stream.getTracks().forEach(t => t.stop());
-        navigate('/dashboard');
+        
+        if (data.role === 'principal') navigate('/principal');
+        else if (data.role === 'hod') navigate('/hod');
+        else if (data.role === 'admin') navigate('/admin');
+        else if (data.role === 'faculty') navigate(loginTarget === 'manual' ? '/faculty/manual' : '/faculty');
+        else navigate('/student');
       } else {
         setLoginError(data.detail || 'Login failed');
       }
@@ -136,7 +272,7 @@ export default function Home() {
       <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-8 pt-24">
         <div className="flex justify-between items-start">
           <div className="text-cyan-400 font-mono text-xs opacity-70">
-            SYS.OP.MODE: AUTO_ATTENDANCE<br/>
+            SYS.OP.MODE: {isScanningActive ? 'AUTO_ATTENDANCE' : 'STANDBY'}<br/>
             TARGET: FACE_REC<br/>
             STATUS: ACTIVE
           </div>
@@ -148,31 +284,25 @@ export default function Home() {
         </div>
         
         {/* Center Reticle */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-cyan-500/30 rounded-full flex items-center justify-center">
-          <div className="w-1 h-4 bg-cyan-500 absolute top-0"></div>
-          <div className="w-1 h-4 bg-cyan-500 absolute bottom-0"></div>
-          <div className="w-4 h-1 bg-cyan-500 absolute left-0"></div>
-          <div className="w-4 h-1 bg-cyan-500 absolute right-0"></div>
-          
-          <motion.div 
-            animate={{ scale: [1, 1.05, 1], opacity: [0.5, 0.8, 0.5] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className="w-48 h-48 border-2 border-cyan-400/50 rounded-lg"
-          ></motion.div>
-        </div>
+        {isScanningActive && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-cyan-500/30 rounded-full flex items-center justify-center">
+            <div className="w-1 h-4 bg-cyan-500 absolute top-0"></div>
+            <div className="w-1 h-4 bg-cyan-500 absolute bottom-0"></div>
+            <div className="w-4 h-1 bg-cyan-500 absolute left-0"></div>
+            <div className="w-4 h-1 bg-cyan-500 absolute right-0"></div>
+            
+            <motion.div 
+              animate={{ scale: [1, 1.05, 1], opacity: [0.5, 0.8, 0.5] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="w-48 h-48 border-2 border-cyan-400/50 rounded-lg"
+            ></motion.div>
+          </div>
+        )}
 
         <div className="flex justify-between items-end">
-          <div className="text-center font-mono text-cyan-400 text-sm bg-black/50 inline-block px-4 py-1 rounded backdrop-blur">
-            {status}
+          <div className="text-center font-mono text-cyan-400 text-sm bg-black/50 inline-block px-4 py-1 rounded backdrop-blur border border-cyan-900/50">
+            {isScanningActive ? challengeText : 'Awaiting action...'}
           </div>
-          
-          {/* Teacher Login Toggle Button (Pointer Events Enabled here) */}
-          <button 
-            onClick={() => setShowLogin(true)}
-            className="pointer-events-auto bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white flex items-center gap-2 px-6 py-3 rounded-full transition-all"
-          >
-            <UserCircle2 size={18} /> Teacher Portal
-          </button>
         </div>
       </div>
 
@@ -182,9 +312,30 @@ export default function Home() {
           autoPlay 
           playsInline 
           muted 
-          className="w-full h-full object-cover filter contrast-125 saturate-50"
+          className={`w-full h-full object-cover filter transition-all duration-700 ${isScanningActive ? 'contrast-125 saturate-50' : 'grayscale blur-sm opacity-60'}`}
         ></video>
         <canvas ref={canvasRef} className="hidden"></canvas>
+        
+        {/* Action Buttons Overlay */}
+        {!isScanningActive && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-20 gap-6">
+            <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">AI Attendance Assistant Pro</h1>
+            
+            <button 
+              onClick={() => setIsScanningActive(true)}
+              className="w-80 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_0_30px_rgba(6,182,212,0.5)] transform hover:scale-105"
+            >
+              <Camera size={24} /> Student Live Face Scan
+            </button>
+            
+            <button 
+              onClick={() => openLogin('dashboard')}
+              className="w-80 bg-indigo-900/60 hover:bg-indigo-800/80 border border-indigo-500/50 text-indigo-100 font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all transform hover:scale-105"
+            >
+              <UserCircle2 size={24} className="text-indigo-400" /> Staff Login
+            </button>
+          </div>
+        )}
         
         {/* History Panel */}
         <div className="absolute left-6 top-24 bottom-24 w-80 bg-black/60 backdrop-blur-xl border border-cyan-900/50 rounded-xl p-4 flex flex-col z-20 pointer-events-none">
@@ -238,7 +389,7 @@ export default function Home() {
           )}
         </AnimatePresence>
         
-        {/* Teacher Login Modal */}
+        {/* Staff Login Modal */}
         <AnimatePresence>
           {showLogin && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -255,9 +406,20 @@ export default function Home() {
                   <X size={24} />
                 </button>
                 
-                <h2 className="text-2xl font-bold mb-6 text-center">Teacher / Admin Login</h2>
+                <h2 className="text-2xl font-bold mb-6 text-center">Staff Login</h2>
                 {loginError && <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded mb-4">{loginError}</div>}
                 <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <select 
+                      className="w-full bg-black/30 border border-slate-700 rounded-lg px-4 py-3 text-white focus:border-cyan-500 focus:outline-none mb-4"
+                      id="role-select"
+                      defaultValue="faculty"
+                    >
+                      <option value="principal">Principal</option>
+                      <option value="hod">HOD</option>
+                      <option value="faculty">Faculty</option>
+                    </select>
+                  </div>
                   <div>
                     <input 
                       type="text" 
