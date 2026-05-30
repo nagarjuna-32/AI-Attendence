@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.core.config import settings
 from backend.db.database import Base, engine
-from backend.api.routers import auth, students, attendance, dashboard, reports, architecture, analytics
+from backend.api.routers import auth, students, attendance, dashboard, reports, architecture, analytics, alerts, faculty_mgmt
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -28,6 +28,8 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["Dashboar
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(architecture.router, prefix="/api/v1/architecture", tags=["Architecture"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
+app.include_router(faculty_mgmt.router, prefix="/api/v1/faculty_mgmt", tags=["Faculty Management"])
 
 @app.get("/")
 def read_root():

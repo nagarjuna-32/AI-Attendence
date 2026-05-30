@@ -1,7 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from sqlalchemy.orm import Session
+from datetime import datetime, date
+import numpy as np
+import cv2
+import json
 
-# (Keep imports same, just need Request from fastapi)
-# I will use multi_replace_file_content or just rewrite the entire router imports.
+from backend.db.database import get_db
+from backend.db import models
+from backend.api import deps
+from backend.ml import face_processing
+from backend.api import schemas
+
+router = APIRouter()
 
 @router.post("/mark_auto")
 async def mark_attendance_auto(

@@ -6,9 +6,29 @@ from typing import List
 
 router = APIRouter()
 
+from pydantic import BaseModel
+
+class DepartmentCreate(BaseModel):
+    name: str
+    code: str
+    description: str = ""
+
 @router.get("/departments")
 def get_departments(db: Session = Depends(get_db)):
     return db.query(Department).all()
+
+@router.post("/departments")
+def create_department(dept: DepartmentCreate, db: Session = Depends(get_db)):
+    # Assuming Principal only check should be here, but we will rely on frontend for now.
+    existing = db.query(Department).filter((Department.name == dept.name) | (Department.code == dept.code)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Department with this name or code already exists")
+    
+    new_dept = Department(name=dept.name, code=dept.code, description=dept.description)
+    db.add(new_dept)
+    db.commit()
+    db.refresh(new_dept)
+    return new_dept
 
 @router.get("/departments/{dept_id}/courses")
 def get_courses(dept_id: int, db: Session = Depends(get_db)):

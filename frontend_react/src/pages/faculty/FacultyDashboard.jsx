@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Users, Camera, Clock, CheckCircle } from 'lucide-react';
+import { BookOpen, Users, Camera, Clock, CheckCircle, Calendar, AlertTriangle, Activity } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import { fetchWithAuth } from '../../utils/api';
 
@@ -39,6 +39,14 @@ export default function FacultyDashboard() {
           <div>
             <h1 className="text-3xl font-bold">Faculty Portal</h1>
             <p className="text-slate-400 mt-2">Manage your subjects and attendance sessions.</p>
+          </div>
+          <div>
+            <button 
+              onClick={() => navigate('/faculty/alerts')}
+              className="bg-rose-500/20 hover:bg-rose-500/40 text-rose-400 px-4 py-2 rounded-lg border border-rose-500/50 flex items-center gap-2 transition-all font-bold"
+            >
+              <AlertTriangle size={18} /> Manage Alerts
+            </button>
           </div>
         </div>
 
@@ -133,6 +141,33 @@ export default function FacultyDashboard() {
             )}
           </div>
         )}
+
+        {/* Performance Statistics Section */}
+        <h2 className="text-xl font-bold mb-4 mt-8 flex items-center gap-2 text-indigo-400">
+          <Activity size={20} /> Performance Statistics
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-center">
+            <div className="text-slate-400 text-xs uppercase mb-1">Classes Conducted</div>
+            <div className="text-2xl font-bold text-white">48</div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-center">
+            <div className="text-slate-400 text-xs uppercase mb-1">Attendance Completion</div>
+            <div className="text-2xl font-bold text-emerald-400">98%</div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-center">
+            <div className="text-slate-400 text-xs uppercase mb-1">Student Avg</div>
+            <div className="text-2xl font-bold text-cyan-400">82%</div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-rose-900/50 text-center">
+            <div className="text-slate-400 text-xs uppercase mb-1">Defaulters (&lt;75%)</div>
+            <div className="text-2xl font-bold text-rose-400">12</div>
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 text-center">
+            <div className="text-slate-400 text-xs uppercase mb-1">Alerts Sent</div>
+            <div className="text-2xl font-bold text-amber-400">15</div>
+          </div>
+        </div>
 
       </div>
     </div>

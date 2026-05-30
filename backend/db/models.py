@@ -75,6 +75,18 @@ class Faculty(Base):
     full_name = Column(String, nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"))
     
+    # New fields for HOD workflow
+    faculty_id = Column(String, unique=True, nullable=True) # Official Employee ID
+    email = Column(String, unique=True, nullable=True)
+    phone = Column(String, nullable=True)
+    qualification = Column(String, nullable=True)
+    designation = Column(String, nullable=True)
+    experience = Column(Integer, nullable=True) # In years
+    joining_date = Column(Date, nullable=True)
+    created_by_hod = Column(Integer, ForeignKey("hods.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, default="Active") # Active, Inactive
+    
     assignments = relationship("FacultySubject", back_populates="faculty")
 
 class FacultySubject(Base):
@@ -120,6 +132,7 @@ class Student(Base):
     usn = Column(String, unique=True, index=True, nullable=False)
     section_id = Column(Integer, ForeignKey("sections.id"))
     email = Column(String, unique=True)
+    parent_email = Column(String, nullable=True)
     phone = Column(String, unique=True)
     eye_verified = Column(Boolean, default=False)
     face_quality_score = Column(Float, default=0.0)
@@ -192,3 +205,41 @@ class AttendanceCorrectionRequest(Base):
     reason = Column(String, nullable=False)
     status = Column(String, default="Pending") # Pending, Approved, Rejected
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class AlertHistory(Base):
+    __tablename__ = "alert_history"
+    id = Column(Integer, primary_key=True, index=True)
+    faculty_id = Column(Integer, ForeignKey("faculty.id"))
+    student_id = Column(Integer, ForeignKey("students.id"))
+    subject_id = Column(Integer, ForeignKey("subjects.id"))
+    sent_at = Column(DateTime, default=datetime.utcnow)
+    attendance_percentage = Column(Float, nullable=False)
+    alert_type = Column(String, nullable=False) # Warning, High Risk, Critical
+    status = Column(String, default="Sent") # Sent, Failed
+    parent_copied = Column(Boolean, default=False)
+    custom_note = Column(Text, nullable=True)
+    
+    faculty = relationship("Faculty")
+    student = relationship("Student")
+    subject = relationship("Subject")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    type = Column(String, nullable=False) # e.g. "FACULTY_REGISTRATION"
+    target_role = Column(String, nullable=False) # e.g. "principal"
+    created_by = Column(Integer, nullable=True) # ID of creator (e.g. HOD ID)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_read = Column(Boolean, default=False)
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    activity_type = Column(String, nullable=False) # e.g. "FACULTY_CREATED"
+    description = Column(Text, nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    performed_by = Column(Integer, nullable=False) # ID of user who performed it
+    role = Column(String, nullable=False) # Role of performer
+    timestamp = Column(DateTime, default=datetime.utcnow)

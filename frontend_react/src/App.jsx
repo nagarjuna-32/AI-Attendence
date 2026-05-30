@@ -8,8 +8,11 @@ import PrincipalDashboard from './pages/principal/PrincipalDashboard';
 import HODDashboard from './pages/hod/HODDashboard';
 import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import BulkScanner from './pages/faculty/BulkScanner';
+import FacultyAlerts from './pages/faculty/FacultyAlerts';
 import StudentDashboard from './pages/student/StudentDashboard';
 import ManualAttendance from './pages/ManualAttendance';
+
+import RegisterFaculty from './pages/hod/RegisterFaculty';
 
 // Ensure standard authentication wrapper (simulated for now based on role localstorage)
 const ProtectedRoute = ({ children, role }) => {
@@ -41,6 +44,9 @@ function App() {
         <Route path="/hod" element={
           <ProtectedRoute role="hod"><HODDashboard /></ProtectedRoute>
         } />
+        <Route path="/hod/register-faculty" element={
+          <ProtectedRoute role="hod"><RegisterFaculty /></ProtectedRoute>
+        } />
 
         {/* Faculty Portal */}
         <Route path="/faculty" element={
@@ -51,6 +57,9 @@ function App() {
         } />
         <Route path="/faculty/manual" element={
           <ProtectedRoute role="faculty"><ManualAttendance /></ProtectedRoute>
+        } />
+        <Route path="/faculty/alerts" element={
+          <ProtectedRoute role="faculty"><FacultyAlerts /></ProtectedRoute>
         } />
 
         {/* Student Portal */}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Navbar from '../../components/Navbar';
-import { Users, Building2, Calendar, FileText, CheckCircle2, Download, AlertTriangle, Filter } from 'lucide-react';
+import { Users, Building2, Calendar, FileText, CheckCircle2, Download, AlertTriangle, Filter, Bell, UserPlus } from 'lucide-react';
 import { fetchWithAuth, API_BASE } from '../../utils/api';
 import {
   Chart as ChartJS,
@@ -21,6 +21,8 @@ export default function PrincipalDashboard() {
   const [overview, setOverview] = useState(null);
   const [filterData, setFilterData] = useState(null);
   const [departments, setDepartments] = useState([]);
+  const [alertsSummary, setAlertsSummary] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedSem, setSelectedSem] = useState('');
@@ -29,14 +31,22 @@ export default function PrincipalDashboard() {
   useEffect(() => {
     const initLoad = async () => {
       try {
-        const [overviewRes, deptsRes] = await Promise.all([
+        const [overviewRes, deptsRes, alertsRes, notifRes] = await Promise.all([
           fetchWithAuth('/analytics/overview'),
-          fetchWithAuth('/architecture/departments')
+          fetchWithAuth('/architecture/departments'),
+          fetchWithAuth('/alerts/metrics/principal'),
+          fetchWithAuth('/faculty_mgmt/notifications')
         ]);
         
         if (overviewRes && deptsRes) {
           setOverview(await overviewRes.json());
           setDepartments(await deptsRes.json());
+        }
+        if (alertsRes && alertsRes.ok) {
+          setAlertsSummary(await alertsRes.json());
+        }
+        if (notifRes && notifRes.ok) {
+          setNotifications(await notifRes.json());
         }
       } catch (err) {
         console.error("Failed to load overview");
@@ -160,6 +170,91 @@ export default function PrincipalDashboard() {
             <h3 className="text-slate-400 text-sm uppercase tracking-wider">Absent Today</h3>
             <div className="text-3xl font-bold mt-2 text-rose-300">{overview?.absent_today || 0}</div>
             <div className="text-sm text-rose-400/70 font-mono mt-1">Students</div>
+          </div>
+        </div>
+
+        {/* Create Department Form */}
+        <div className="mb-8 glass-panel p-6 border border-cyan-500/20">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-cyan-400">
+            <Building2 size={20} /> Manage Departments
+          </h2>
+          <form className="flex gap-4 items-end" onSubmit={async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const name = form.name.value;
+            const code = form.code.value;
+            try {
+              const res = await fetchWithAuth('/architecture/departments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, code, description: '' })
+              });
+              if(res.ok) {
+                const newDept = await res.json();
+                setDepartments([...departments, newDept]);
+                form.reset();
+              } else {
+                alert("Failed to create department. Code/Name may already exist.");
+              }
+            } catch (err) {
+              alert("Network Error");
+            }
+          }}>
+            <div className="flex-1">
+              <label className="block text-sm text-slate-400 mb-1">Department Name *</label>
+              <input required name="name" type="text" placeholder="e.g. Artificial Intelligence" className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-cyan-500 outline-none text-white" />
+            </div>
+            <div className="w-32">
+              <label className="block text-sm text-slate-400 mb-1">Code *</label>
+              <input required name="code" type="text" placeholder="e.g. AIDS" className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-cyan-500 outline-none text-white uppercase" />
+            </div>
+            <button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-2 rounded font-bold transition-all h-[42px]">
+              + Add Dept
+            </button>
+          </form>
+        </div>
+
+        {/* Department Alert Summary */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-rose-400">
+            <AlertTriangle size={20} /> Department Alert Summary
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {alertsSummary.map(dept => (
+              <div key={dept.department} className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 flex justify-between items-center">
+                <span className="text-slate-400 font-bold">{dept.department}</span>
+                <span className="text-xl font-bold text-rose-400">{dept.alerts_count} Alerts</span>
+              </div>
+            ))}
+            {alertsSummary.length === 0 && (
+              <div className="col-span-4 text-slate-500 italic">No alerts recorded yet.</div>
+            )}
+          </div>
+        </div>
+
+        {/* System Notifications */}
+        <div className="mb-8 glass-panel p-6 border-t-2 border-indigo-500">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-indigo-400">
+            <Bell size={20} /> System Notifications
+          </h2>
+          <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+            {notifications.map(notif => (
+              <div key={notif.id} className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 flex justify-between items-start">
+                <div>
+                  <div className="font-bold text-white flex items-center gap-2">
+                    {notif.type === 'FACULTY_REGISTRATION' && <UserPlus size={16} className="text-emerald-400" />}
+                    {notif.title}
+                  </div>
+                  <div className="text-sm text-slate-400 mt-1">{notif.description}</div>
+                </div>
+                <div className="text-xs text-slate-500">
+                  {new Date(notif.created_at).toLocaleDateString()}
+                </div>
+              </div>
+            ))}
+            {notifications.length === 0 && (
+              <div className="text-slate-500 italic p-4 text-center border border-dashed border-slate-700 rounded-lg">No new notifications.</div>
+            )}
           </div>
         </div>
 
