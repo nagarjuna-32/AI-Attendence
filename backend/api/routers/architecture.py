@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.db.database import get_db
-from backend.db.models import Department, Course, Semester, Section, Subject, Faculty, FacultySubject
+from backend.db.models import Department, Course, Semester, Section, Subject, Faculty, FacultySubject, HOD
 from typing import List
+from backend.core import security
 
 router = APIRouter()
 
@@ -13,13 +14,27 @@ class DepartmentCreate(BaseModel):
     code: str
     description: str = ""
 
+class HODCreate(BaseModel):
+    username: str
+    password: str
+    full_name: str
+
 @router.get("/departments")
 def get_departments(db: Session = Depends(get_db)):
-    return db.query(Department).all()
+    departments = db.query(Department).all()
+    result = []
+    for d in departments:
+        result.append({
+            "id": d.id,
+            "name": d.name,
+            "code": d.code,
+            "description": d.description,
+            "hod_name": d.hod.full_name if d.hod else None
+        })
+    return result
 
 @router.post("/departments")
 def create_department(dept: DepartmentCreate, db: Session = Depends(get_db)):
-    # Assuming Principal only check should be here, but we will rely on frontend for now.
     existing = db.query(Department).filter((Department.name == dept.name) | (Department.code == dept.code)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Department with this name or code already exists")
@@ -28,7 +43,37 @@ def create_department(dept: DepartmentCreate, db: Session = Depends(get_db)):
     db.add(new_dept)
     db.commit()
     db.refresh(new_dept)
-    return new_dept
+    return {
+        "id": new_dept.id,
+        "name": new_dept.name,
+        "code": new_dept.code,
+        "description": new_dept.description,
+        "hod_name": None
+    }
+
+@router.post("/departments/{dept_id}/hod")
+def create_hod(dept_id: int, hod_data: HODCreate, db: Session = Depends(get_db)):
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+        
+    if dept.hod:
+        raise HTTPException(status_code=400, detail="Department already has an HOD assigned")
+        
+    existing_username = db.query(HOD).filter(HOD.username == hod_data.username).first()
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+        
+    new_hod = HOD(
+        username=hod_data.username,
+        password_hash=security.get_password_hash(hod_data.password),
+        full_name=hod_data.full_name,
+        department_id=dept_id
+    )
+    db.add(new_hod)
+    db.commit()
+    db.refresh(new_hod)
+    return {"message": "HOD created successfully", "hod_name": new_hod.full_name}
 
 @router.get("/departments/{dept_id}/courses")
 def get_courses(dept_id: int, db: Session = Depends(get_db)):

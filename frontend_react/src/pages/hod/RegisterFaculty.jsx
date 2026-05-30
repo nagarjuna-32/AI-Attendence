@@ -39,15 +39,9 @@ export default function RegisterFaculty() {
     // Basic setup: load courses for the HOD's department (mock logic for dropdowns)
     const loadCourses = async () => {
       try {
-        // HOD is bound to a department, fetch courses for their dept. 
-        // We will fetch all departments and take the first course as mock for simplicity.
-        const res = await fetchWithAuth('/architecture/departments');
-        const depts = await res.json();
-        if (depts.length > 0) {
-          const cRes = await fetchWithAuth(`/architecture/departments/${depts[0].id}/courses`);
-          const cData = await cRes.json();
-          setCourses(cData);
-        }
+        const cRes = await fetchWithAuth('/faculty_mgmt/my-department/courses');
+        const cData = await cRes.json();
+        setCourses(cData);
       } catch (err) {}
     };
     loadCourses();

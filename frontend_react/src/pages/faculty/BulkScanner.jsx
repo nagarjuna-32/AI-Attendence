@@ -148,9 +148,17 @@ export default function BulkScanner() {
               <div className="text-3xl font-bold text-purple-400">+{stats.newly_marked}</div>
             </div>
             <div className="w-px bg-white/10"></div>
-            <div className="text-center">
+            <div className="text-center flex flex-col items-center justify-center">
               <div className="text-sm text-slate-400 font-mono">UNKNOWN</div>
               <div className="text-3xl font-bold text-rose-400">{stats.unknown}</div>
+              {stats.unknown > 0 && (
+                <button 
+                  onClick={() => navigate('/register')} 
+                  className="mt-2 text-xs bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 px-3 py-1 rounded-full border border-rose-500/50 transition-all font-bold whitespace-nowrap"
+                >
+                  Register Student
+                </button>
+              )}
             </div>
           </div>
 

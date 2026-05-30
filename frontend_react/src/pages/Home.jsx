@@ -27,26 +27,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   const stateRef = useRef('IDLE');
-  const challengeRef = useRef('');
   const [challengeText, setChallengeText] = useState('Awaiting manual start...');
-  const blinkCountRef = useRef(0);
-  const isBlinkingRef = useRef(false);
-
-  const calculateEAR = (landmarks, leftIndices, rightIndices) => {
-    const d = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
-    const getEAR = (indices) => (
-      d(landmarks[indices[1]], landmarks[indices[5]]) + 
-      d(landmarks[indices[2]], landmarks[indices[4]])
-    ) / (2.0 * d(landmarks[indices[0]], landmarks[indices[3]]));
-    return (getEAR(leftIndices) + getEAR(rightIndices)) / 2.0;
-  };
-
-  const calculateMAR = (landmarks) => {
-    const d = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
-    const vert = d(landmarks[13], landmarks[14]); // inner lips
-    const horiz = d(landmarks[78], landmarks[308]); // corners
-    return vert / (horiz + 1e-6);
-  };
 
   useEffect(() => {
     if (!isScanningActive || showLogin) return;
@@ -66,57 +47,14 @@ export default function Home() {
             return;
           }
           
-          const landmarks = results.multiFaceLandmarks[0];
-          
-          const nose = landmarks[1];
-          const leftCheek = landmarks[234];
-          const rightCheek = landmarks[454];
-          const yaw = (nose.x - leftCheek.x) / (rightCheek.x - leftCheek.x); // ~0.5 is center
-
           if (stateRef.current === 'IDLE') {
-            const challenges = ['BLINK_ONCE', 'BLINK_TWICE', 'TURN_LEFT', 'TURN_RIGHT', 'LOOK_STRAIGHT', 'SMILE'];
-            challengeRef.current = challenges[Math.floor(Math.random() * challenges.length)];
             stateRef.current = 'CHALLENGE';
-            blinkCountRef.current = 0;
-            isBlinkingRef.current = false;
-          }
-          
-          if (stateRef.current === 'CHALLENGE') {
-            const ear = calculateEAR(landmarks, [33, 160, 158, 133, 153, 144], [362, 385, 387, 263, 373, 380]);
-            const mar = calculateMAR(landmarks);
-
-            // Track blinks globally for blink challenges
-            if (ear < 0.20 && !isBlinkingRef.current) {
-              isBlinkingRef.current = true;
-            } else if (ear > 0.25 && isBlinkingRef.current) {
-              isBlinkingRef.current = false;
-              blinkCountRef.current += 1;
-            }
-
-            if (challengeRef.current === 'BLINK_ONCE') {
-              setChallengeText("Security Check: Please BLINK ONCE.");
-              if (blinkCountRef.current >= 1) proceedToCapture();
-            }
-            else if (challengeRef.current === 'BLINK_TWICE') {
-              setChallengeText(`Security Check: Please BLINK TWICE. (${blinkCountRef.current}/2)`);
-              if (blinkCountRef.current >= 2) proceedToCapture();
-            }
-            else if (challengeRef.current === 'TURN_LEFT') {
-              setChallengeText("Security Check: Turn your head slightly LEFT.");
-              if (yaw < 0.35) proceedToCapture();
-            }
-            else if (challengeRef.current === 'TURN_RIGHT') {
-              setChallengeText("Security Check: Turn your head slightly RIGHT.");
-              if (yaw > 0.65) proceedToCapture();
-            }
-            else if (challengeRef.current === 'LOOK_STRAIGHT') {
-              setChallengeText("Security Check: Look perfectly STRAIGHT.");
-              if (yaw > 0.45 && yaw < 0.55) proceedToCapture();
-            }
-            else if (challengeRef.current === 'SMILE') {
-              setChallengeText("Security Check: Please SMILE.");
-              if (mar > 0.15) proceedToCapture(); // threshold for smiling
-            }
+            setChallengeText("Face detected! Processing...");
+            setTimeout(() => {
+              if (stateRef.current === 'CHALLENGE') {
+                proceedToCapture();
+              }
+            }, 1000); // 1 second delay to let user stabilize
           }
         } else {
           setChallengeText("No face detected. Please look at the camera.");
@@ -154,7 +92,7 @@ export default function Home() {
 
   const proceedToCapture = () => {
     stateRef.current = 'PROCESSING';
-    setChallengeText("Liveness Verified! Authenticating...");
+    setChallengeText("Face Captured! Authenticating...");
     captureAndSend();
   };
 
@@ -326,6 +264,13 @@ export default function Home() {
               className="w-80 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_0_30px_rgba(6,182,212,0.5)] transform hover:scale-105"
             >
               <Camera size={24} /> Student Live Face Scan
+            </button>
+            
+            <button 
+              onClick={() => navigate('/register')}
+              className="w-80 bg-emerald-500/80 hover:bg-emerald-600 border border-emerald-400 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] transform hover:scale-105"
+            >
+              <UserCircle2 size={24} /> Register New Student
             </button>
             
             <button 

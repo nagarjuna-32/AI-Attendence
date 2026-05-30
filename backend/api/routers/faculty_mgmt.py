@@ -139,3 +139,9 @@ def get_activity_logs(department_id: Optional[int] = None, db: Session = Depends
         
     logs = query.order_by(models.ActivityLog.timestamp.desc()).limit(100).all()
     return logs
+
+@router.get("/my-department/courses")
+def get_my_courses(db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    if current_user.role != "hod":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    return db.query(models.Course).filter(models.Course.department_id == current_user.department_id).all()

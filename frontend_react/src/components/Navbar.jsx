@@ -26,12 +26,7 @@ const Navbar = () => {
           </>
         ) : (
           <>
-            <Link to="/dashboard" className={`flex items-center gap-2 hover:text-white transition-colors ${location.pathname === '/dashboard' ? 'text-white' : 'text-slate-400'}`}>
-              <LayoutDashboard size={18} /> Dashboard
-            </Link>
-            <Link to="/manual" className={`flex items-center gap-2 hover:text-white transition-colors ${location.pathname === '/manual' ? 'text-white' : 'text-slate-400'}`}>
-              <ClipboardCheck size={18} /> Manual Entry
-            </Link>
+
             <button onClick={handleLogout} className="flex items-center gap-2 text-slate-400 hover:text-red-400 transition-colors">
               <LogOut size={18} /> Logout
             </button>

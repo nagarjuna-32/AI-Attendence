@@ -23,6 +23,7 @@ export default function PrincipalDashboard() {
   const [departments, setDepartments] = useState([]);
   const [alertsSummary, setAlertsSummary] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [assignHodModal, setAssignHodModal] = useState({ show: false, deptId: null, deptName: '' });
   
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedSem, setSelectedSem] = useState('');
@@ -214,6 +215,42 @@ export default function PrincipalDashboard() {
           </form>
         </div>
 
+        {/* Departments List with HODs */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-indigo-400">
+            <Users size={20} /> Department & HOD Directory
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {departments.map(dept => (
+              <div key={dept.id} className="bg-slate-900/80 p-5 rounded-xl border border-slate-700/50 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-white text-lg">{dept.name}</h3>
+                    <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono">{dept.code}</span>
+                  </div>
+                  <div className="text-sm text-slate-400 mt-4">Assigned HOD:</div>
+                  {dept.hod_name ? (
+                    <div className="text-emerald-400 font-bold flex items-center gap-2 mt-1">
+                      <CheckCircle2 size={16} /> {dept.hod_name}
+                    </div>
+                  ) : (
+                    <div className="text-rose-400/80 italic mt-1">No HOD Assigned</div>
+                  )}
+                </div>
+                
+                {!dept.hod_name && (
+                  <button 
+                    onClick={() => setAssignHodModal({ show: true, deptId: dept.id, deptName: dept.name })}
+                    className="mt-4 w-full bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 py-2 rounded-lg border border-indigo-500/50 transition-all font-bold flex items-center justify-center gap-2"
+                  >
+                    <UserPlus size={16} /> Assign HOD
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Department Alert Summary */}
         <div className="mb-8">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-rose-400">
@@ -360,6 +397,67 @@ export default function PrincipalDashboard() {
         )}
 
       </div>
+
+      {/* Assign HOD Modal */}
+      {assignHodModal.show && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-indigo-500/30 p-6 rounded-2xl w-full max-w-md">
+            <h3 className="text-2xl font-bold text-white mb-2">Assign HOD</h3>
+            <p className="text-slate-400 mb-6">for {assignHodModal.deptName}</p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.target;
+              try {
+                const res = await fetchWithAuth(`/architecture/departments/${assignHodModal.deptId}/hod`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    full_name: form.fullName.value,
+                    username: form.username.value,
+                    password: form.password.value
+                  })
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  // Update local state
+                  setDepartments(departments.map(d => 
+                    d.id === assignHodModal.deptId ? { ...d, hod_name: data.hod_name } : d
+                  ));
+                  setAssignHodModal({ show: false, deptId: null, deptName: '' });
+                } else {
+                  const err = await res.json();
+                  alert(`Failed: ${err.detail || 'Unknown error'}`);
+                }
+              } catch (error) {
+                alert("Network error");
+              }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Full Name</label>
+                <input required name="fullName" type="text" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Username</label>
+                <input required name="username" type="text" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Password</label>
+                <input required name="password" type="password" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none" />
+              </div>
+              <div className="flex gap-4 mt-6">
+                <button type="button" onClick={() => setAssignHodModal({ show: false, deptId: null, deptName: '' })} className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition-all">
+                  Cancel
+                </button>
+                <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-all">
+                  Save HOD
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
