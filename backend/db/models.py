@@ -39,7 +39,7 @@ class Section(Base):
     name = Column(String, nullable=False) # e.g. "A", "B"
     
     semester = relationship("Semester", back_populates="sections")
-    students = relationship("Student", back_populates="section")
+    students = relationship("Student", back_populates="section_obj")
 
 class Subject(Base):
     __tablename__ = "subjects"
@@ -83,6 +83,7 @@ class Faculty(Base):
     designation = Column(String, nullable=True)
     experience = Column(Integer, nullable=True) # In years
     joining_date = Column(Date, nullable=True)
+    subject_taught = Column(String, nullable=True)
     created_by_hod = Column(Integer, ForeignKey("hods.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="Active") # Active, Inactive
@@ -122,6 +123,9 @@ class TimetableEntry(Base):
     faculty_id = Column(Integer, ForeignKey("faculty.id"))
     
     version_obj = relationship("TimetableVersion", back_populates="entries")
+    subject = relationship("Subject")
+    section = relationship("Section")
+    faculty = relationship("Faculty")
 
 class Student(Base):
     __tablename__ = "students"
@@ -138,7 +142,11 @@ class Student(Base):
     face_quality_score = Column(Float, default=0.0)
     registered_at = Column(DateTime, default=datetime.utcnow)
     
-    section = relationship("Section", back_populates="students")
+    department = Column(String, nullable=True)
+    semester = Column(String, nullable=True)
+    section = Column(String, nullable=True)
+    
+    section_obj = relationship("Section", back_populates="students")
     encodings = relationship("FaceEncoding", back_populates="student", cascade="all, delete-orphan")
     attendances = relationship("Attendance", back_populates="student", cascade="all, delete-orphan")
     predictions = relationship("AttendancePrediction", back_populates="student", cascade="all, delete-orphan")
@@ -163,6 +171,7 @@ class Attendance(Base):
     confidence_score = Column(String)
     
     student = relationship("Student", back_populates="attendances")
+    timetable_entry = relationship("TimetableEntry")
 
 class UnknownFace(Base):
     __tablename__ = "unknown_faces"

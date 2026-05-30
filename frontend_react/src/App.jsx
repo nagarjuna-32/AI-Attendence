@@ -6,13 +6,13 @@ import Registration from './pages/Registration';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import PrincipalDashboard from './pages/principal/PrincipalDashboard';
 import HODDashboard from './pages/hod/HODDashboard';
+import RegisterFaculty from './pages/hod/RegisterFaculty';
+import TimetableManager from './pages/hod/TimetableManager';
 import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import BulkScanner from './pages/faculty/BulkScanner';
 import FacultyAlerts from './pages/faculty/FacultyAlerts';
 import StudentDashboard from './pages/student/StudentDashboard';
 import ManualAttendance from './pages/ManualAttendance';
-
-import RegisterFaculty from './pages/hod/RegisterFaculty';
 
 // Ensure standard authentication wrapper (simulated for now based on role localstorage)
 const ProtectedRoute = ({ children, role }) => {
@@ -46,6 +46,9 @@ function App() {
         } />
         <Route path="/hod/register-faculty" element={
           <ProtectedRoute role="hod"><RegisterFaculty /></ProtectedRoute>
+        } />
+        <Route path="/hod/timetable" element={
+          <ProtectedRoute role="hod"><TimetableManager /></ProtectedRoute>
         } />
 
         {/* Faculty Portal */}

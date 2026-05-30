@@ -15,6 +15,8 @@ export default function Home() {
   const [alert, setAlert] = useState(null); 
   const [showLogin, setShowLogin] = useState(false);
   const [isScanningActive, setIsScanningActive] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const timeoutRef = useRef(null);
   
   const [loginTarget, setLoginTarget] = useState('dashboard'); // 'dashboard' or 'manual'
   
@@ -87,6 +89,7 @@ export default function Home() {
     return () => {
       if (cameraInstance) cameraInstance.stop();
       if (stream) stream.getTracks().forEach(t => t.stop());
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [isScanningActive, showLogin]);
 
@@ -119,6 +122,8 @@ export default function Home() {
         const data = await res.json();
         
         if (data.status === 'success') {
+          stateRef.current = 'SUCCESS';
+          setScanSuccess(true);
           setAlert({ type: 'success', msg: data.message || `Welcome back, ${data.student.name}!` });
           setHistory(prev => [{
             time: new Date().toLocaleTimeString(),
@@ -128,10 +133,13 @@ export default function Home() {
             status: 'Recognized'
           }, ...prev].slice(0, 5));
           
-          setTimeout(() => {
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => {
+            setScanSuccess(false);
             setAlert(null);
-            setIsScanningActive(false); // Stop scan after success
-          }, 4000);
+            setIsScanningActive(false); // Stop scan after 30s
+            stateRef.current = 'IDLE';
+          }, 30000);
         } else if (data.status === 'unknown') {
           setAlert({ type: 'error', msg: 'Face Not Registered! Redirecting...' });
           setTimeout(() => {
@@ -151,7 +159,7 @@ export default function Home() {
       } catch (err) {
         setChallengeText("Network Error.");
       } finally {
-        // Only reset if we didn't early return on error
+        // Only reset to IDLE if we didn't succeed or early return
         if (stateRef.current === 'PROCESSING') {
            setIsProcessing(false);
            stateRef.current = 'IDLE';
@@ -260,10 +268,14 @@ export default function Home() {
             <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">AI Attendance Assistant Pro</h1>
             
             <button 
-              onClick={() => setIsScanningActive(true)}
+              onClick={() => {
+                setIsScanningActive(true);
+                setScanSuccess(false);
+                stateRef.current = 'IDLE';
+              }}
               className="w-80 bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-4 px-6 rounded-xl flex items-center justify-center gap-3 transition-all shadow-[0_0_30px_rgba(6,182,212,0.5)] transform hover:scale-105"
             >
-              <Camera size={24} /> Student Live Face Scan
+              <Camera size={24} /> Mark Attendance for Student
             </button>
             
             <button 
@@ -330,6 +342,32 @@ export default function Home() {
                   {alert.type === 'success' ? 'Attendance Recorded' : 'Action Required'}
                 </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Next Student Button */}
+        <AnimatePresence>
+          {scanSuccess && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="absolute bottom-12 left-1/2 -translate-x-1/2 z-40"
+            >
+              <button 
+                onClick={() => {
+                  if (timeoutRef.current) clearTimeout(timeoutRef.current);
+                  setScanSuccess(false);
+                  setAlert(null);
+                  stateRef.current = 'IDLE';
+                  setChallengeText('Awaiting next student...');
+                  setIsProcessing(false);
+                }}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-10 rounded-full shadow-[0_0_30px_rgba(16,185,129,0.5)] border-2 border-emerald-400 text-xl tracking-wide transform transition-all hover:scale-105"
+              >
+                Scan Next Student
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

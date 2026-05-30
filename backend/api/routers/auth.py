@@ -54,3 +54,37 @@ def login_access_token(db: Session = Depends(get_db), form_data: OAuth2PasswordR
         headers={"WWW-Authenticate": "Bearer"},
     )
 
+from pydantic import BaseModel
+from typing import Optional
+class ChangePasswordSchema(BaseModel):
+    old_password: str
+    new_password: Optional[str] = None
+    new_username: Optional[str] = None
+
+from backend.api import deps
+@router.post("/change-password")
+def change_password(payload: ChangePasswordSchema, db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    # Verify old password based on role
+    user_model = None
+    if current_user.role == "hod":
+        user_model = db.query(models.HOD).filter(models.HOD.id == current_user.id).first()
+    elif current_user.role == "faculty":
+        user_model = db.query(models.Faculty).filter(models.Faculty.id == current_user.id).first()
+    elif current_user.role == "principal":
+        user_model = db.query(models.Principal).filter(models.Principal.id == current_user.id).first()
+        
+    if not user_model:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not security.verify_password(payload.old_password, user_model.password_hash):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+        
+    if payload.new_password:
+        user_model.password_hash = security.get_password_hash(payload.new_password)
+    if payload.new_username:
+        user_model.username = payload.new_username
+        
+    db.commit()
+    
+    return {"status": "success", "message": "Credentials updated successfully"}
+

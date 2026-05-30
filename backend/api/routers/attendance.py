@@ -31,7 +31,7 @@ async def mark_attendance_auto(
         
     feature, quality_score, err = face_processing.extract_face_feature(img)
     
-    if quality_score < 75.0:
+    if quality_score < 15.0:
         db.add(models.ScanAuditLog(
             status="Failed", 
             failure_reason="Face quality too low", 
@@ -256,7 +256,6 @@ def mark_attendance_manual(
     if existing:
         existing.status = record.status
         existing.method = "Manual"
-        existing.marked_by = current_user.username
         db.commit()
         db.refresh(existing)
         return existing
@@ -267,7 +266,6 @@ def mark_attendance_manual(
         time=now.time(),
         status=record.status,
         method="Manual",
-        marked_by=current_user.username,
         confidence_score="Manual"
     )
     db.add(attendance)

@@ -21,29 +21,20 @@ export default function Registration() {
   
   // Logic Refs
   const stateRef = useRef('WAITING_FACE');
-  const blinkDetected = useRef(false);
   const captureCount = useRef(0);
-
-  const calculateEAR = (landmarks, leftIndices, rightIndices) => {
-    const d = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
-    const getEAR = (indices) => (
-      d(landmarks[indices[1]], landmarks[indices[5]]) + 
-      d(landmarks[indices[2]], landmarks[indices[4]])
-    ) / (2.0 * d(landmarks[indices[0]], landmarks[indices[3]]));
-    return (getEAR(leftIndices) + getEAR(rightIndices)) / 2.0;
-  };
 
   useEffect(() => {
     if (step !== 2) return;
     
     let cameraInstance = null;
+    let localStream = null;
     
     const initFaceMesh = async () => {
       const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
       faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
       
       faceMesh.onResults((results) => {
-        if (stateRef.current === 'DONE') return;
+        if (stateRef.current === 'DONE' || stateRef.current === 'CAPTURING') return;
 
         if (results.multiFaceLandmarks?.length > 0) {
           if (results.multiFaceLandmarks.length > 1) {
@@ -51,57 +42,40 @@ export default function Registration() {
             return;
           }
           
-          const landmarks = results.multiFaceLandmarks[0];
-          
-          // Basic 3D Pose Estimation heuristics
-          const nose = landmarks[1];
-          const leftCheek = landmarks[234];
-          const rightCheek = landmarks[454];
-          const yaw = (nose.x - leftCheek.x) / (rightCheek.x - leftCheek.x); // roughly 0.5 is center
-
           if (stateRef.current === 'WAITING_FACE') {
-            stateRef.current = 'WAITING_BLINK';
-            setStatus("Face Quality: 94% (Approved). Please BLINK your eyes.");
-            setProgress(25);
-          }
-          else if (stateRef.current === 'WAITING_BLINK') {
-            const ear = calculateEAR(landmarks, [33, 160, 158, 133, 153, 144], [362, 385, 387, 263, 373, 380]);
-            if (ear < 0.20) blinkDetected.current = true;
-            else if (blinkDetected.current && ear > 0.25) {
-              stateRef.current = 'WAITING_TURN_LEFT';
-              setStatus("Liveness 1/3 Passed. Now turn your head LEFT.");
-              setProgress(50);
-            }
-          }
-          else if (stateRef.current === 'WAITING_TURN_LEFT') {
-            if (yaw < 0.35) { // Turned left (from camera perspective)
-              stateRef.current = 'WAITING_TURN_RIGHT';
-              setStatus("Liveness 2/3 Passed. Now turn your head RIGHT.");
-              setProgress(75);
-            }
-          }
-          else if (stateRef.current === 'WAITING_TURN_RIGHT') {
-            if (yaw > 0.65) { // Turned right
-              stateRef.current = 'CAPTURING';
+            stateRef.current = 'CAPTURING';
+            setStatus("Face detected! Verifying quality...");
+            setProgress(50);
+            
+            setTimeout(() => {
               setEyeVerified(true);
-              setStatus("Liveness Verified! Capturing Face Data...");
+              setStatus("Face Quality Verified! Capturing...");
               setProgress(90);
               startCapture();
-            }
+            }, 1000);
           }
         } else {
-          if (stateRef.current.startsWith('WAITING')) setStatus("No face detected. Please look at the camera.");
+          if (stateRef.current === 'WAITING_FACE') setStatus("No face detected. Please look at the camera.");
         }
       });
 
-      if (videoRef.current) {
-        cameraInstance = new window.Camera(videoRef.current, {
-          onFrame: async () => {
-            if(videoRef.current) await faceMesh.send({image: videoRef.current});
-          },
-          width: 640, height: 480
-        });
-        cameraInstance.start();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+        localStream = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          cameraInstance = new window.Camera(videoRef.current, {
+            onFrame: async () => {
+              if(videoRef.current && stateRef.current !== 'DONE') {
+                await faceMesh.send({image: videoRef.current});
+              }
+            },
+            width: 640, height: 480
+          });
+          cameraInstance.start();
+        }
+      } catch (err) {
+        setStatus("Camera access denied or unavailable.");
       }
     };
     
@@ -109,6 +83,7 @@ export default function Registration() {
     
     return () => {
       if (cameraInstance) cameraInstance.stop();
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
     };
   }, [step]);
 
@@ -197,9 +172,35 @@ export default function Registration() {
               >
                 <div className="md:col-span-2"><input type="text" placeholder="Full Name" required className="glass-input" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} /></div>
                 <div><input type="text" placeholder="USN / Roll No" required className="glass-input" value={formData.usn} onChange={e => setFormData({...formData, usn: e.target.value})} /></div>
-                <div><input type="text" placeholder="Department" required className="glass-input" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} /></div>
-                <div><input type="text" placeholder="Semester" required className="glass-input" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value})} /></div>
-                <div><input type="text" placeholder="Section" required className="glass-input" value={formData.section} onChange={e => setFormData({...formData, section: e.target.value})} /></div>
+                <div>
+                  <select required className="glass-input" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}>
+                    <option value="" disabled>Select Department</option>
+                    <option value="CSE">Computer Science and Engineering (CSE)</option>
+                    <option value="ISE">Information Science and Engineering (ISE)</option>
+                    <option value="AIML">Artificial Intelligence and Machine Learning (AIML)</option>
+                    <option value="AIDS">Artificial Intelligence and Data Science (AIDS)</option>
+                    <option value="ECE">Electronics and Communication Engineering (ECE)</option>
+                    <option value="EEE">Electrical and Electronics Engineering (EEE)</option>
+                    <option value="MECH">Mechanical Engineering (MECH)</option>
+                    <option value="CIVIL">Civil Engineering (CIVIL)</option>
+                  </select>
+                </div>
+                <div>
+                  <select required className="glass-input" value={formData.semester} onChange={e => setFormData({...formData, semester: e.target.value})}>
+                    <option value="" disabled>Select Semester</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                      <option key={sem} value={sem}>{sem}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <select required className="glass-input" value={formData.section} onChange={e => setFormData({...formData, section: e.target.value})}>
+                    <option value="" disabled>Select Section</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                  </select>
+                </div>
                 <div><input type="email" placeholder="Email" required className="glass-input" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
                 <div><input type="tel" placeholder="Phone" required className="glass-input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
                 <div className="md:col-span-2 mt-4">
@@ -239,8 +240,8 @@ export default function Registration() {
                 <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-4 rounded-lg flex items-start gap-3 mb-6">
                   <CheckCircle2 className="shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="font-bold">Liveness Verified Successfully</h3>
-                    <p className="text-sm opacity-80">Your face and eye blink were successfully captured. Please confirm to finalize registration.</p>
+                    <h3 className="font-bold">Face Captured Successfully</h3>
+                    <p className="text-sm opacity-80">Your face was successfully captured. Please confirm to finalize registration.</p>
                   </div>
                 </div>
                 
@@ -252,9 +253,27 @@ export default function Registration() {
                   ))}
                 </div>
                 
-                <button onClick={handleSubmit} disabled={loading} className="glass-btn">
-                  {loading ? 'Registering...' : 'Finalize Registration'}
-                </button>
+                <div className="flex gap-4">
+                  <button onClick={handleSubmit} disabled={loading} className="glass-btn flex-1">
+                    {loading ? 'Registering...' : 'Finalize Registration'}
+                  </button>
+                  {error && (
+                    <button 
+                      onClick={() => {
+                        stateRef.current = 'WAITING_FACE';
+                        captureCount.current = 0;
+                        setStep(2);
+                        setCapturedImages([]);
+                        setProgress(0);
+                        setError('');
+                        setStatus('Initializing AI Camera...');
+                      }} 
+                      className="glass-btn !bg-rose-500/20 !border-rose-500/50 !text-rose-400 hover:!bg-rose-500/30 flex-1"
+                    >
+                      Retake Images
+                    </button>
+                  )}
+                </div>
               </motion.div>
             )}
             

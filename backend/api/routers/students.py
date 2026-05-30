@@ -33,8 +33,9 @@ async def register_student(
     if db.query(models.Student).filter(models.Student.phone == phone).first():
         raise HTTPException(status_code=400, detail="Phone number is already registered.")
         
-    if not eye_verified:
-        raise HTTPException(status_code=400, detail="Liveness verification failed. Eye blink was not detected.")
+    # Liveness check bypassed as per user request
+    # if not eye_verified:
+    #     raise HTTPException(status_code=400, detail="Liveness verification failed. Eye blink was not detected.")
         
     if len(images) < 3:
         raise HTTPException(status_code=400, detail="Please provide at least 3 face images.")
@@ -50,10 +51,11 @@ async def register_student(
         if img is None:
             continue
             
-        if face_processing.check_blur(img):
-            raise HTTPException(status_code=400, detail="One or more images are blurry. Please retake.")
+        quality_score = face_processing.calculate_face_quality(img)
+        if quality_score < 15.0:
+            raise HTTPException(status_code=400, detail="One or more images are low quality or blurry. Please retake.")
             
-        feature, err = face_processing.extract_face_feature(img)
+        feature, _, err = face_processing.extract_face_feature(img)
         if err:
             raise HTTPException(status_code=400, detail=f"Image processing error: {err}")
             
@@ -76,11 +78,34 @@ async def register_student(
             matched_student = db.query(models.Student).filter(models.Student.id == match_id).first()
             raise HTTPException(status_code=400, detail=f"Face already registered with another student record ({matched_student.usn}).")
             
+    dept_obj = db.query(models.Department).filter(models.Department.code == department).first()
+    if not dept_obj:
+        raise HTTPException(status_code=400, detail="Invalid department code")
+        
+    course_obj = db.query(models.Course).filter(models.Course.department_id == dept_obj.id).first()
+    if not course_obj:
+        raise HTTPException(status_code=400, detail="Course not found for department")
+        
+    sem_obj = db.query(models.Semester).filter(
+        models.Semester.course_id == course_obj.id,
+        models.Semester.number == int(semester)
+    ).first()
+    if not sem_obj:
+        raise HTTPException(status_code=400, detail="Semester not found")
+    
+    sec_obj = db.query(models.Section).filter(
+        models.Section.semester_id == sem_obj.id,
+        models.Section.name == section
+    ).first()
+
+    if not sec_obj:
+        raise HTTPException(status_code=400, detail="Section not found")
+
     # Save student
     student = models.Student(
         full_name=full_name, usn=usn, department=department,
-        semester=semester, year_sem=semester, section=section, email=email, phone=phone,
-        eye_verified=eye_verified
+        semester=semester, section=section, section_id=sec_obj.id,
+        email=email, phone=phone, eye_verified=eye_verified
     )
     db.add(student)
     db.commit()

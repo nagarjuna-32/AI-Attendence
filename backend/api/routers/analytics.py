@@ -79,7 +79,7 @@ def get_overview(db: Session = Depends(get_db), current_user = Depends(deps.get_
 def filter_analytics(
     department_id: Optional[int] = None,
     semester: Optional[int] = None,
-    section_id: Optional[int] = None,
+    section: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user = Depends(deps.get_current_user)
 ):
@@ -97,9 +97,9 @@ def filter_analytics(
     if semester:
         query = query.filter(models.Semester.number == semester)
         student_q = student_q.filter(models.Semester.number == semester)
-    if section_id:
-        query = query.filter(models.Section.id == section_id)
-        student_q = student_q.filter(models.Section.id == section_id)
+    if section:
+        query = query.filter(models.Section.name == section)
+        student_q = student_q.filter(models.Section.name == section)
         
     total_students = student_q.count()
     
@@ -164,6 +164,7 @@ def export_report(
     format: str = "csv",
     department_id: Optional[int] = None,
     semester: Optional[int] = None,
+    section: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user = Depends(deps.get_current_user)
 ):
@@ -176,15 +177,17 @@ def export_report(
         query = query.filter(models.Course.department_id == department_id)
     if semester:
         query = query.filter(models.Semester.number == semester)
+    if section:
+        query = query.filter(models.Section.name == section)
         
     records = query.all()
     
     data = []
     for r in records:
         subj = r.timetable_entry.subject.name if r.timetable_entry and r.timetable_entry.subject else "Unknown"
-        dept = r.student.section.semester.course.department.name
-        sem = r.student.section.semester.number
-        sec = r.student.section.name
+        dept = r.student.department if r.student.department else "Unknown"
+        sem = r.student.semester if r.student.semester else "Unknown"
+        sec = r.student.section if r.student.section else "Unknown"
         
         data.append({
             "Date": r.date.isoformat(),

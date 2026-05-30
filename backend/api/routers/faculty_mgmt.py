@@ -22,6 +22,7 @@ class FacultyRegistrationSchema(BaseModel):
     designation: str
     experience: int
     joining_date: str
+    subject_taught: str = ""
     subject_id: int
     subject_code: str
     semester_id: int
@@ -60,6 +61,7 @@ def register_faculty(payload: FacultyRegistrationSchema, db: Session = Depends(g
         designation=payload.designation,
         experience=payload.experience,
         joining_date=joining,
+        subject_taught=payload.subject_taught,
         created_by_hod=current_user.id,
         status="Active"
     )

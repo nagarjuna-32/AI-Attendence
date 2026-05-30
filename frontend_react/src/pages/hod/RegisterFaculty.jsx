@@ -22,6 +22,7 @@ export default function RegisterFaculty() {
     designation: 'Assistant Professor',
     experience: 0,
     joining_date: '',
+    subject_taught: '',
     course_id: '',
     semester_id: '',
     section_id: '',
@@ -202,6 +203,10 @@ export default function RegisterFaculty() {
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Joining Date</label>
                 <input type="date" name="joining_date" value={formData.joining_date} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 focus:border-cyan-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Subject (Text)</label>
+                <input type="text" name="subject_taught" value={formData.subject_taught} onChange={handleChange} placeholder="e.g. Data Structures" className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 focus:border-cyan-500 outline-none" />
               </div>
             </div>
           </div>

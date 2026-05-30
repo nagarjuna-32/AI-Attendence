@@ -24,9 +24,12 @@ export default function PrincipalDashboard() {
   const [alertsSummary, setAlertsSummary] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [assignHodModal, setAssignHodModal] = useState({ show: false, deptId: null, deptName: '' });
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedSem, setSelectedSem] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -63,7 +66,8 @@ export default function PrincipalDashboard() {
       try {
         let url = '/analytics/filter?';
         if (selectedDept) url += `department_id=${selectedDept}&`;
-        if (selectedSem) url += `semester=${selectedSem}`;
+        if (selectedSem) url += `semester=${selectedSem}&`;
+        if (selectedSection) url += `section=${selectedSection}`;
         
         const res = await fetchWithAuth(url);
         if (res) {
@@ -72,12 +76,13 @@ export default function PrincipalDashboard() {
       } catch (err) {}
     };
     loadFiltered();
-  }, [selectedDept, selectedSem]);
+  }, [selectedDept, selectedSem, selectedSection]);
 
   const handleExport = (format) => {
     let url = `${API_BASE}/analytics/export?format=${format}`;
     if (selectedDept) url += `&department_id=${selectedDept}`;
     if (selectedSem) url += `&semester=${selectedSem}`;
+    if (selectedSection) url += `&section=${selectedSection}`;
     
     // Add token for authentication
     const token = localStorage.getItem('token');
@@ -134,6 +139,12 @@ export default function PrincipalDashboard() {
             <p className="text-slate-400 mt-2">Enterprise Overview & System Health</p>
           </div>
           <div className="flex gap-2">
+            <button 
+              onClick={() => setShowCredentialsModal(true)}
+              className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 flex items-center gap-2 transition-all font-bold"
+            >
+              Change Credentials
+            </button>
             <button onClick={() => handleExport('pdf')} className="bg-rose-500/20 text-rose-400 hover:bg-rose-500/40 px-4 py-2 rounded-lg border border-rose-500/50 flex items-center gap-2 transition-colors">
               <FileText size={18} /> PDF
             </button>
@@ -320,6 +331,31 @@ export default function PrincipalDashboard() {
               <option key={s} value={s}>Semester {s}</option>
             ))}
           </select>
+          <select 
+            className="bg-black/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            value={selectedSection}
+            onChange={(e) => setSelectedSection(e.target.value)}
+          >
+            <option value="">All Sections</option>
+            {['A', 'B', 'C'].map(s => (
+              <option key={s} value={s}>Section {s}</option>
+            ))}
+          </select>
+          <div className="flex-1 min-w-[200px]">
+            <input 
+              type="text" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by USN or Name..." 
+              className="w-full bg-black/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          <button 
+            onClick={() => { /* Triggered by useEffect anyway, but good for UX */ }}
+            className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+          >
+            Search
+          </button>
         </div>
 
         {/* Filter Results & Charts */}
@@ -454,6 +490,69 @@ export default function PrincipalDashboard() {
                   Save HOD
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Credentials Modal */}
+      {showCredentialsModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md relative">
+            <button onClick={() => setShowCredentialsModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+            <h3 className="text-2xl font-bold text-white mb-2">Change Credentials</h3>
+            <p className="text-slate-400 text-sm mb-6">Leave new username or password blank to keep current.</p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const form = e.target;
+              if (form.newPassword.value && form.newPassword.value !== form.confirmPassword.value) {
+                alert("New passwords do not match!");
+                return;
+              }
+              if (!form.newUsername.value && !form.newPassword.value) {
+                alert("Please provide either a new username or new password.");
+                return;
+              }
+              
+              try {
+                const res = await fetchWithAuth('/auth/change-password', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    old_password: form.oldPassword.value,
+                    new_password: form.newPassword.value || null,
+                    new_username: form.newUsername.value || null
+                  })
+                });
+                if (res.ok) {
+                  alert("Credentials updated successfully!");
+                  setShowCredentialsModal(false);
+                } else {
+                  const err = await res.json();
+                  alert(err.detail || "Update failed");
+                }
+              } catch (err) { alert("Network error"); }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Current Password (Required)</label>
+                <input required name="oldPassword" type="password" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">New Username (Optional)</label>
+                <input name="newUsername" type="text" placeholder="Leave blank to keep current" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">New Password (Optional)</label>
+                <input name="newPassword" type="password" placeholder="Leave blank to keep current" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">Confirm New Password</label>
+                <input name="confirmPassword" type="password" className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-cyan-500 outline-none" />
+              </div>
+              <button type="submit" className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-bold transition-all mt-4">
+                Update Credentials
+              </button>
             </form>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Search, CheckCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { fetchWithAuth, API_BASE } from '../utils/api';
 
