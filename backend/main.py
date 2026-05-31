@@ -1,8 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from backend.core.config import settings
 from backend.db.database import Base, engine
-from backend.api.routers import auth, students, attendance, dashboard, reports, architecture, analytics, alerts, faculty_mgmt, timetable
+from backend.api.routers import (
+    auth,
+    students,
+    attendance,
+    dashboard,
+    reports,
+    architecture,
+    analytics,
+    alerts,
+    faculty_mgmt,
+    timetable,
+)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -12,15 +24,20 @@ app = FastAPI(
     version="3.0.0"
 )
 
-# Configure CORS for frontend
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to the frontend URL
+    allow_origins=[
+        "https://ai-attendence-beta.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(students.router, prefix="/api/v1/students", tags=["Students"])
 app.include_router(attendance.router, prefix="/api/v1/attendance", tags=["Attendance"])
@@ -34,4 +51,14 @@ app.include_router(timetable.router, prefix="/api/v1/timetable", tags=["Timetabl
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Smart Attendance Assistant API"}
+    return {
+        "message": "Welcome to Smart Attendance Assistant API",
+        "status": "running",
+        "version": "3.0.0"
+    }
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy"
+    }
