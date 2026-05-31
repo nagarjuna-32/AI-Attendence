@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import Navbar from '../../components/Navbar';
+import { Layout } from '../../components/Layout';
+import { StatCard } from '../../components/ui/StatCard';
 import { Users, Building2, Calendar, FileText, CheckCircle2, Download, AlertTriangle, Filter, Bell, UserPlus } from 'lucide-react';
 import { fetchWithAuth, API_BASE } from '../../utils/api';
 import {
@@ -129,61 +130,65 @@ export default function PrincipalDashboard() {
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400">Loading Analytics...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <Navbar />
-      
-      <div className="max-w-7xl mx-auto px-4 py-8 mt-16">
-        <header className="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Principal Analytics Center</h1>
-            <p className="text-slate-400 mt-2">Enterprise Overview & System Health</p>
-          </div>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => setShowCredentialsModal(true)}
-              className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 flex items-center gap-2 transition-all font-bold"
-            >
-              Change Credentials
-            </button>
-            <button onClick={() => handleExport('pdf')} className="bg-rose-500/20 text-rose-400 hover:bg-rose-500/40 px-4 py-2 rounded-lg border border-rose-500/50 flex items-center gap-2 transition-colors">
-              <FileText size={18} /> PDF
-            </button>
-            <button onClick={() => handleExport('excel')} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 px-4 py-2 rounded-lg border border-emerald-500/50 flex items-center gap-2 transition-colors">
-              <Download size={18} /> Excel
-            </button>
-            <button onClick={() => handleExport('csv')} className="bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/40 px-4 py-2 rounded-lg border border-cyan-500/50 flex items-center gap-2 transition-colors">
-              <FileText size={18} /> CSV
-            </button>
-          </div>
-        </header>
-
-        {/* Global Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="glass-panel p-6 flex flex-col items-center justify-center text-center border-t-4 border-indigo-500">
-            <Building2 className="text-indigo-400 mb-2" size={32} />
-            <h3 className="text-slate-400 text-sm uppercase tracking-wider">Best Dept</h3>
-            <div className="text-xl font-bold mt-2 text-indigo-300">{overview?.best_dept?.name || 'N/A'}</div>
-            <div className="text-sm text-emerald-400 font-mono mt-1">{overview?.best_dept?.percentage}%</div>
-          </div>
-          <div className="glass-panel p-6 flex flex-col items-center justify-center text-center border-t-4 border-emerald-500">
-            <Users className="text-emerald-400 mb-2" size={32} />
-            <h3 className="text-slate-400 text-sm uppercase tracking-wider">Total Students</h3>
-            <div className="text-3xl font-bold mt-2 text-emerald-300">{overview?.total_students || 0}</div>
-            <div className="text-sm text-emerald-400/70 font-mono mt-1">College Wide</div>
-          </div>
-          <div className="glass-panel p-6 flex flex-col items-center justify-center text-center border-t-4 border-cyan-500">
-            <CheckCircle2 className="text-cyan-400 mb-2" size={32} />
-            <h3 className="text-slate-400 text-sm uppercase tracking-wider">Overall Attendance</h3>
-            <div className="text-3xl font-bold mt-2 text-cyan-300">{overview?.overall_percentage || 0}%</div>
-            <div className="text-sm text-cyan-400/70 font-mono mt-1">Average</div>
-          </div>
-          <div className="glass-panel p-6 flex flex-col items-center justify-center text-center border-t-4 border-rose-500">
-            <AlertTriangle className="text-rose-400 mb-2" size={32} />
-            <h3 className="text-slate-400 text-sm uppercase tracking-wider">Absent Today</h3>
-            <div className="text-3xl font-bold mt-2 text-rose-300">{overview?.absent_today || 0}</div>
-            <div className="text-sm text-rose-400/70 font-mono mt-1">Students</div>
-          </div>
+    <Layout role="principal" title="Principal Analytics Center">
+      <div className="mb-10 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+        <div>
+          <p className="text-slate-400">Enterprise Overview & System Health</p>
         </div>
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={() => setShowCredentialsModal(true)}
+            className="glass-btn-outline px-4 py-2 text-sm"
+          >
+            Change Credentials
+          </button>
+          <button onClick={() => handleExport('pdf')} className="bg-rose-500/20 text-rose-400 hover:bg-rose-500/40 px-4 py-2 rounded-lg border border-rose-500/50 flex items-center gap-2 transition-colors text-sm font-semibold">
+            <FileText size={16} /> PDF
+          </button>
+          <button onClick={() => handleExport('excel')} className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 px-4 py-2 rounded-lg border border-emerald-500/50 flex items-center gap-2 transition-colors text-sm font-semibold">
+            <Download size={16} /> Excel
+          </button>
+          <button onClick={() => handleExport('csv')} className="bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/40 px-4 py-2 rounded-lg border border-cyan-500/50 flex items-center gap-2 transition-colors text-sm font-semibold">
+            <FileText size={16} /> CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Global Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard 
+          title="Best Dept" 
+          value={overview?.best_dept?.name || 'N/A'} 
+          subtitle={`${overview?.best_dept?.percentage || 0}%`} 
+          icon={Building2} 
+          color="indigo" 
+          delay={0.1} 
+        />
+        <StatCard 
+          title="Total Students" 
+          value={overview?.total_students || 0} 
+          subtitle="College Wide" 
+          icon={Users} 
+          color="emerald" 
+          delay={0.2} 
+        />
+        <StatCard 
+          title="Overall Attendance" 
+          value={`${overview?.overall_percentage || 0}%`} 
+          subtitle="Average" 
+          icon={CheckCircle2} 
+          color="cyan" 
+          delay={0.3} 
+        />
+        <StatCard 
+          title="Absent Today" 
+          value={overview?.absent_today || 0} 
+          subtitle="Students" 
+          icon={AlertTriangle} 
+          color="rose" 
+          delay={0.4} 
+        />
+      </div>
 
         {/* Create Department Form */}
         <div className="mb-8 glass-panel p-6 border border-cyan-500/20">
@@ -213,14 +218,14 @@ export default function PrincipalDashboard() {
             }
           }}>
             <div className="flex-1">
-              <label className="block text-sm text-slate-400 mb-1">Department Name *</label>
-              <input required name="name" type="text" placeholder="e.g. Artificial Intelligence" className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-cyan-500 outline-none text-white" />
+              <label className="block text-sm text-slate-400 mb-1 font-medium">Department Name *</label>
+              <input required name="name" type="text" placeholder="e.g. Artificial Intelligence" className="glass-input" />
             </div>
-            <div className="w-32">
-              <label className="block text-sm text-slate-400 mb-1">Code *</label>
-              <input required name="code" type="text" placeholder="e.g. AIDS" className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-cyan-500 outline-none text-white uppercase" />
+            <div className="w-40">
+              <label className="block text-sm text-slate-400 mb-1 font-medium">Code *</label>
+              <input required name="code" type="text" placeholder="e.g. AIDS" className="glass-input uppercase" />
             </div>
-            <button type="submit" className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-2 rounded font-bold transition-all h-[42px]">
+            <button type="submit" className="glass-btn h-[50px]">
               + Add Dept
             </button>
           </form>
@@ -233,26 +238,28 @@ export default function PrincipalDashboard() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {departments.map(dept => (
-              <div key={dept.id} className="bg-slate-900/80 p-5 rounded-xl border border-slate-700/50 flex flex-col justify-between">
+              <div key={dept.id} className="glass-card p-6 flex flex-col justify-between group">
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-white text-lg">{dept.name}</h3>
-                    <span className="bg-slate-800 text-slate-300 px-2 py-1 rounded text-xs font-mono">{dept.code}</span>
+                    <h3 className="font-bold text-white text-lg group-hover:text-indigo-400 transition-colors">{dept.name}</h3>
+                    <span className="bg-slate-800 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-md text-xs font-mono">{dept.code}</span>
                   </div>
-                  <div className="text-sm text-slate-400 mt-4">Assigned HOD:</div>
+                  <div className="text-sm text-slate-400 mt-4 font-medium">Assigned HOD:</div>
                   {dept.hod_name ? (
-                    <div className="text-emerald-400 font-bold flex items-center gap-2 mt-1">
+                    <div className="text-emerald-400 font-bold flex items-center gap-2 mt-1.5">
                       <CheckCircle2 size={16} /> {dept.hod_name}
                     </div>
                   ) : (
-                    <div className="text-rose-400/80 italic mt-1">No HOD Assigned</div>
+                    <div className="text-rose-400/80 italic mt-1.5 flex items-center gap-1.5">
+                      <AlertTriangle size={14} /> No HOD Assigned
+                    </div>
                   )}
                 </div>
                 
                 {!dept.hod_name && (
                   <button 
                     onClick={() => setAssignHodModal({ show: true, deptId: dept.id, deptName: dept.name })}
-                    className="mt-4 w-full bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 py-2 rounded-lg border border-indigo-500/50 transition-all font-bold flex items-center justify-center gap-2"
+                    className="mt-6 w-full bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 py-2.5 rounded-lg border border-indigo-500/30 transition-all font-semibold flex items-center justify-center gap-2"
                   >
                     <UserPlus size={16} /> Assign HOD
                   </button>
@@ -269,9 +276,9 @@ export default function PrincipalDashboard() {
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {alertsSummary.map(dept => (
-              <div key={dept.department} className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 flex justify-between items-center">
-                <span className="text-slate-400 font-bold">{dept.department}</span>
-                <span className="text-xl font-bold text-rose-400">{dept.alerts_count} Alerts</span>
+              <div key={dept.department} className="glass-card p-5 flex justify-between items-center border-l-4 border-l-rose-500">
+                <span className="text-slate-200 font-medium">{dept.department}</span>
+                <span className="text-xl font-bold text-rose-400">{dept.alerts_count} <span className="text-xs font-normal text-rose-400/60 uppercase">Alerts</span></span>
               </div>
             ))}
             {alertsSummary.length === 0 && (
@@ -287,15 +294,17 @@ export default function PrincipalDashboard() {
           </h2>
           <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
             {notifications.map(notif => (
-              <div key={notif.id} className="bg-slate-900/50 p-4 rounded-lg border border-slate-800 flex justify-between items-start">
-                <div>
-                  <div className="font-bold text-white flex items-center gap-2">
-                    {notif.type === 'FACULTY_REGISTRATION' && <UserPlus size={16} className="text-emerald-400" />}
-                    {notif.title}
+              <div key={notif.id} className="glass-card p-4 flex justify-between items-start !rounded-lg !border-slate-800/80">
+                <div className="flex gap-3">
+                  <div className="mt-1">
+                    {notif.type === 'FACULTY_REGISTRATION' ? <UserPlus size={18} className="text-emerald-400" /> : <Bell size={18} className="text-indigo-400" />}
                   </div>
-                  <div className="text-sm text-slate-400 mt-1">{notif.description}</div>
+                  <div>
+                    <div className="font-semibold text-white">{notif.title}</div>
+                    <div className="text-sm text-slate-400 mt-1">{notif.description}</div>
+                  </div>
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs font-medium text-slate-500 bg-slate-900 px-2 py-1 rounded-md">
                   {new Date(notif.created_at).toLocaleDateString()}
                 </div>
               </div>
@@ -307,12 +316,13 @@ export default function PrincipalDashboard() {
         </div>
 
         {/* Filter Bar */}
-        <div className="bg-slate-900 border border-slate-700 p-4 rounded-xl flex flex-wrap gap-4 items-center mb-8">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Filter size={20} /> <span className="font-bold">Deep Dive Filters:</span>
+        <div className="glass-panel p-4 flex flex-wrap gap-4 items-center mb-8 border border-slate-700/50">
+          <div className="flex items-center gap-2 text-cyan-400">
+            <Filter size={20} /> <span className="font-bold tracking-wide uppercase text-sm">Deep Dive Filters</span>
           </div>
+          <div className="w-px h-8 bg-slate-700 mx-2 hidden md:block"></div>
           <select 
-            className="bg-black/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            className="glass-input !w-auto !py-2 !px-3 !bg-slate-900"
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
           >
@@ -322,7 +332,7 @@ export default function PrincipalDashboard() {
             ))}
           </select>
           <select 
-            className="bg-black/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            className="glass-input !w-auto !py-2 !px-3 !bg-slate-900"
             value={selectedSem}
             onChange={(e) => setSelectedSem(e.target.value)}
           >
@@ -332,7 +342,7 @@ export default function PrincipalDashboard() {
             ))}
           </select>
           <select 
-            className="bg-black/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+            className="glass-input !w-auto !py-2 !px-3 !bg-slate-900"
             value={selectedSection}
             onChange={(e) => setSelectedSection(e.target.value)}
           >
@@ -347,15 +357,9 @@ export default function PrincipalDashboard() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by USN or Name..." 
-              className="w-full bg-black/50 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
+              className="glass-input !py-2"
             />
           </div>
-          <button 
-            onClick={() => { /* Triggered by useEffect anyway, but good for UX */ }}
-            className="bg-cyan-500 hover:bg-cyan-600 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-[0_0_15px_rgba(6,182,212,0.4)]"
-          >
-            Search
-          </button>
         </div>
 
         {/* Filter Results & Charts */}
@@ -431,8 +435,6 @@ export default function PrincipalDashboard() {
             </div>
           </div>
         )}
-
-      </div>
 
       {/* Assign HOD Modal */}
       {assignHodModal.show && (
@@ -557,6 +559,7 @@ export default function PrincipalDashboard() {
           </div>
         </div>
       )}
-    </div>
+      {/* Modals are unaffected but can be restyled later if needed */}
+    </Layout>
   );
 }

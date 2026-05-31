@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, FileText, CheckCircle2, Edit2, Save, X, Calendar } from 'lucide-react';
 import { API_BASE, fetchWithAuth } from '../../utils/api';
-import Navbar from '../../components/Navbar';
+import { Layout } from '../../components/Layout';
 
 export default function TimetableManager() {
   const [timetables, setTimetables] = useState([]);
@@ -83,10 +83,8 @@ export default function TimetableManager() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-20">
-      <Navbar />
-      
-      <div className="max-w-7xl mx-auto px-4 py-8 mt-16">
+    <Layout role="hod" title="Timetable Management">
+      <div className="max-w-7xl mx-auto px-4 py-8 mt-4">
         <header className="mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent flex items-center gap-3">
             <Calendar size={36} className="text-emerald-400" />
@@ -205,6 +203,6 @@ export default function TimetableManager() {
           ))}
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../../components/Navbar';
+import { Layout } from '../../components/Layout';
 import { UserPlus, Save, Building, BookOpen, AlertCircle, CheckCircle } from 'lucide-react';
 import { fetchWithAuth } from '../../utils/api';
 
@@ -115,9 +115,7 @@ export default function RegisterFaculty() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-12 pt-20">
-      <Navbar />
-      
+    <Layout role="hod" title="Register Faculty">
       <div className="container mx-auto px-4 max-w-4xl mt-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-3 text-emerald-400">
@@ -276,6 +274,6 @@ export default function RegisterFaculty() {
 
         </form>
       </div>
-    </div>
+    </Layout>
   );
 }

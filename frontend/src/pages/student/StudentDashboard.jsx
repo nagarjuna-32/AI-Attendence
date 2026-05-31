@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Target, TrendingUp, AlertTriangle, Lightbulb } from 'lucide-react';
-import Navbar from '../../components/Navbar';
+import { Layout } from '../../components/Layout';
+import { StatCard } from '../../components/ui/StatCard';
 import { fetchWithAuth } from '../../utils/api';
 
 export default function StudentDashboard() {
@@ -30,74 +31,65 @@ export default function StudentDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col pt-20">
-      <Navbar />
-      
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <h1 className="text-3xl font-bold mb-8">Student Portal</h1>
+    <Layout role="student" title="Student Portal">
+      <div className="mb-8">
+        <p className="text-slate-400 mt-2">Track your attendance and AI performance insights.</p>
+      </div>
         
         {loading ? (
           <div className="text-center text-slate-400 py-12">Loading Performance Data...</div>
         ) : (
           <div className="space-y-6">
-            
             {/* AI Recommendation Alert */}
             <motion.div 
               initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-              className="bg-indigo-900/40 border border-indigo-500/50 rounded-xl p-6 flex items-start gap-4 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
+              className="bg-indigo-950/40 border border-indigo-500/30 rounded-2xl p-6 flex items-start gap-5 shadow-[0_0_30px_rgba(99,102,241,0.1)] relative overflow-hidden"
             >
-              <Lightbulb className="text-indigo-400 shrink-0" size={28} />
-              <div>
-                <h3 className="text-xl font-bold text-indigo-300 mb-1">AI Smart Recommendation</h3>
-                <p className="text-indigo-100/80 text-lg">{recommendation}</p>
+              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-cyan-500"></div>
+              <div className="p-3 bg-indigo-500/10 rounded-xl">
+                <Lightbulb className="text-indigo-400 shrink-0" size={32} />
+              </div>
+              <div className="mt-1">
+                <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                  AI Smart Recommendation
+                  <span className="text-[10px] font-bold tracking-widest bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full uppercase">Powered by ML</span>
+                </h3>
+                <p className="text-indigo-200/80 text-lg leading-relaxed">{recommendation}</p>
               </div>
             </motion.div>
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="glass-panel text-center py-8">
-                <Target className="mx-auto mb-3 text-cyan-400" size={32} />
-                <div className="text-sm text-slate-400 uppercase tracking-widest mb-1">Current Attendance</div>
-                <div className="text-4xl font-bold text-white">82%</div>
-              </div>
-              <div className="glass-panel text-center py-8">
-                <TrendingUp className="mx-auto mb-3 text-emerald-400" size={32} />
-                <div className="text-sm text-slate-400 uppercase tracking-widest mb-1">Predicted EoS</div>
-                <div className="text-4xl font-bold text-white">85%</div>
-              </div>
-              <div className="glass-panel text-center py-8 border-rose-500/30">
-                <AlertTriangle className="mx-auto mb-3 text-rose-400" size={32} />
-                <div className="text-sm text-slate-400 uppercase tracking-widest mb-1">Risk Level</div>
-                <div className="text-4xl font-bold text-emerald-400">SAFE</div>
-              </div>
+              <StatCard title="Current Attendance" value="82%" icon={Target} color="cyan" delay={0.1} />
+              <StatCard title="Predicted EoS" value="85%" icon={TrendingUp} color="emerald" delay={0.2} />
+              <StatCard title="Risk Level" value="SAFE" subtitle="No alerts" icon={AlertTriangle} color="emerald" delay={0.3} />
             </div>
 
             {/* Heatmap */}
-            <div className="glass-panel">
-              <h3 className="text-xl font-bold mb-6">30-Day Attendance Heatmap</h3>
-              <div className="flex flex-wrap gap-2">
+            <div className="glass-panel p-8">
+              <h3 className="text-xl font-bold mb-6 border-b border-slate-700/50 pb-3">30-Day Attendance Heatmap</h3>
+              <div className="flex flex-wrap gap-2.5">
                 {heatmap.map((day, i) => (
                   <div 
                     key={i}
                     title={`${day.date}: ${day.status}`}
-                    className={`w-10 h-10 rounded-md ${day.color} border border-white/10 flex items-center justify-center text-xs font-mono opacity-80 hover:opacity-100 transition-opacity cursor-help`}
+                    className={`w-12 h-12 rounded-lg ${day.color} border border-white/5 flex items-center justify-center text-sm font-mono opacity-80 hover:opacity-100 transition-all hover:scale-110 hover:shadow-lg cursor-help`}
                   >
                     {day.date.split('-')[2]}
                   </div>
                 ))}
               </div>
               
-              <div className="flex items-center gap-6 mt-6 pt-6 border-t border-white/10 text-sm text-slate-400">
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-emerald-500"></div> Present</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-amber-500"></div> Late</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-rose-500"></div> Absent</div>
-                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-slate-800 border border-white/10"></div> Unmarked</div>
+              <div className="flex items-center gap-6 mt-8 pt-6 border-t border-slate-700/50 text-sm text-slate-400 font-medium">
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div> Present</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div> Late</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]"></div> Absent</div>
+                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-md bg-slate-800 border border-slate-700"></div> Unmarked</div>
               </div>
             </div>
 
           </div>
         )}
-      </div>
-    </div>
+    </Layout>
   );
 }

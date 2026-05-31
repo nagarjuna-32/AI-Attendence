@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera as CameraIcon, CheckCircle2, ChevronRight, AlertCircle } from 'lucide-react';
-import Navbar from '../components/Navbar';
+import { Camera as CameraIcon, CheckCircle2, ChevronRight, AlertCircle, ChevronLeft } from 'lucide-react';
 import { API_BASE } from '../utils/api';
 
 export default function Registration() {
@@ -134,11 +133,22 @@ export default function Registration() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
-      <Navbar />
+    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden selection:bg-indigo-500/30">
+      {/* Background Gradients */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-900/20 blur-[120px]" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-900/20 blur-[120px]" />
+      <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay"></div>
+
+      {/* Back Button */}
+      <button 
+        onClick={() => window.location.href='/'}
+        className="absolute top-8 left-8 flex items-center gap-2 text-slate-400 hover:text-white transition-colors z-20 bg-slate-900/50 px-4 py-2 rounded-full border border-slate-800 backdrop-blur"
+      >
+        <ChevronLeft size={18} /> Home
+      </button>
       
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-3xl glass-panel p-8">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 w-full z-10">
+        <div className="w-full max-w-3xl glass-panel border-slate-700/50 shadow-2xl p-8">
           
           {/* Header */}
           <div className="mb-8">
@@ -151,11 +161,10 @@ export default function Registration() {
               <span className={step >= 3 ? 'text-primary' : ''}>Confirm</span>
             </div>
             
-            {/* Progress Bar */}
-            <div className="h-1 w-full bg-white/10 mt-4 rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-slate-800 mt-6 rounded-full overflow-hidden">
               <motion.div 
-                className="h-full bg-gradient-to-r from-primary to-secondary"
-                animate={{ width: `${(step/3)*100}%` }}
+                className="h-full bg-gradient-to-r from-indigo-500 to-cyan-500"
+                animate={{ width: `${(step/4)*100}%` }}
               />
             </div>
           </div>
@@ -226,7 +235,7 @@ export default function Registration() {
                 </div>
                 
                 {/* Visual Progress */}
-                <div className="w-full max-w-md h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="w-full max-w-md h-2 bg-slate-800 rounded-full overflow-hidden mt-4">
                   <motion.div animate={{ width: `${progress}%` }} className="h-full bg-cyan-400" />
                 </div>
               </motion.div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search, CheckCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
-import Navbar from '../components/Navbar';
+import { Layout } from '../components/Layout';
 import { fetchWithAuth, API_BASE } from '../utils/api';
 
 export default function ManualAttendance() {
@@ -47,10 +47,7 @@ export default function ManualAttendance() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col pt-20">
-      <Navbar />
-      
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+    <Layout role="faculty" title="Manual Attendance">
         <div className="glass-panel">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl flex items-center gap-4 mb-8">
             <div className="w-16 h-16 bg-cyan-500/20 rounded-xl flex items-center justify-center border border-cyan-500/50 text-cyan-400">
@@ -134,7 +131,6 @@ export default function ManualAttendance() {
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Layout>
   );
 }

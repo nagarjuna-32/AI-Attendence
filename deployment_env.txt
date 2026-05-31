@@ -1,0 +1,51 @@
+==========================================
+DEPLOYMENT ENVIRONMENT VARIABLES GUIDE
+==========================================
+
+This file contains the exact Environment Variables you need to configure in Vercel and Render for your deployment to work with Neon Database.
+
+------------------------------------------
+1. BACKEND (RENDER) ENVIRONMENT VARIABLES
+------------------------------------------
+When deploying the FastAPI backend as a "Web Service" on Render, you must configure the environment variables so it connects to your Neon PostgreSQL database instead of the local SQLite file.
+
+Add the following environment variables in Render:
+
+Variable 1:
+Name: DATABASE_URL
+Value: <YOUR_NEON_POSTGRES_URL>
+(Example: postgresql://neondb_owner:yourpassword@ep-wispy-water-123.us-east-2.aws.neon.tech/neondb?sslmode=require)
+Note: If Neon gives you a url starting with "postgres://", that is totally fine, our code now handles it automatically!
+
+Variable 2: (Optional but recommended for security)
+Name: SECRET_KEY
+Value: <ANY_RANDOM_LONG_STRING_HERE>
+(Example: my_super_secret_production_key_12345)
+
+
+Render Build Settings:
+- Build Command: pip install -r requirements.txt
+- Start Command: uvicorn backend.main:app --host 0.0.0.0 --port 10000
+
+
+------------------------------------------
+2. FRONTEND (VERCEL) ENVIRONMENT VARIABLES
+------------------------------------------
+Once your Render backend is successfully deployed and running, copy its URL (e.g., https://ai-backend.onrender.com). 
+Then, in Vercel, go to your project Settings -> Environment Variables and add:
+
+Variable 1:
+Name: VITE_API_URL
+Value: <YOUR_RENDER_URL>/api/v1
+(Example: https://ai-backend.onrender.com/api/v1)
+
+Important: 
+- Do NOT include a trailing slash (/) at the very end of the value.
+- After adding this variable in Vercel, you MUST trigger a new deployment in Vercel so the frontend builds with the new API URL!
+
+
+Vercel Build Settings:
+- Framework Preset: Vite
+- Root Directory: frontend
+- Build Command: npm run build
+- Output Directory: dist

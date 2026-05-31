@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Mail, CheckSquare, Search, Send, X, Copy, ShieldAlert } from 'lucide-react';
-import Navbar from '../../components/Navbar';
+import { Layout } from '../../components/Layout';
 import { fetchWithAuth, API_BASE } from '../../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -106,9 +106,7 @@ export default function FacultyAlerts() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col pt-20">
-      <Navbar />
-      
+    <Layout role="faculty" title="Faculty Alert Console">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b border-white/10 pb-6 gap-4">
           <div>
@@ -297,6 +295,6 @@ export default function FacultyAlerts() {
         </AnimatePresence>
 
       </div>
-    </div>
+    </Layout>
   );
 }
