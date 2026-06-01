@@ -225,3 +225,125 @@ def create_entry(data: dict, db: Session = Depends(get_db), current_user = Depen
     db.commit()
     db.refresh(entry)
     return {"status": "success", "message": "Timetable entry added successfully.", "entry_id": entry.id}
+
+@router.post("/upload-text")
+def upload_timetable_text(
+    data: dict,
+    db: Session = Depends(get_db),
+    current_user = Depends(deps.get_current_user)
+):
+    if current_user.role != "hod":
+        raise HTTPException(status_code=403, detail="Only HOD can upload timetable")
+        
+    text = data.get("text", "")
+    semester_id = data.get("semester_id")
+    version_id = data.get("version_id")
+    
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+        
+    import io
+    
+    lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+    if not lines:
+        raise HTTPException(status_code=400, detail="No text lines found")
+        
+    # Check if header is present (using header-specific keywords to avoid 'day' matching weekdays like 'Monday')
+    first_line = lines[0].lower()
+    has_header = ("subject code" in first_line or "start time" in first_line or "end time" in first_line or "faculty username" in first_line)
+    
+    if not has_header:
+        text_to_parse = "Day,Start Time,End Time,Subject Code,Section,Faculty Username\n" + "\n".join(lines)
+    else:
+        text_to_parse = "\n".join(lines)
+        
+    try:
+        df = pd.read_csv(io.StringIO(text_to_parse))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse text as CSV: {str(e)}")
+        
+    required_cols = ["Day", "Start Time", "End Time", "Subject Code", "Section", "Faculty Username"]
+    for col in required_cols:
+        if col not in df.columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing column '{col}'. Required order if no header: Day, Start Time, End Time, Subject Code, Section, Faculty Username"
+            )
+            
+    try:
+        if version_id:
+            # Append to existing version
+            version = db.query(models.TimetableVersion).filter(
+                models.TimetableVersion.id == int(version_id),
+                models.TimetableVersion.department_id == current_user.department_id
+            ).first()
+            if not version:
+                raise HTTPException(status_code=404, detail="Selected timetable version not found")
+        else:
+            # Create a new version
+            last_version = db.query(models.TimetableVersion).filter(
+                models.TimetableVersion.department_id == current_user.department_id
+            ).order_by(models.TimetableVersion.version.desc()).first()
+            v_num = (last_version.version + 1) if last_version else 1
+            
+            version = models.TimetableVersion(
+                department_id=current_user.department_id,
+                version=v_num,
+                status="Draft",
+                created_by=current_user.id
+            )
+            db.add(version)
+            db.flush()
+            
+        added_count = 0
+        for index, row in df.iterrows():
+            subj_code = str(row["Subject Code"]).strip()
+            subj = db.query(models.Subject).filter(models.Subject.code == subj_code).first()
+            if not subj:
+                raise HTTPException(status_code=400, detail=f"Subject Code '{subj_code}' in row {index+1} not found in database.")
+                
+            sec_name = str(row["Section"]).strip()
+            sec = db.query(models.Section).filter(models.Section.name == sec_name).first()
+            if not sec:
+                raise HTTPException(status_code=400, detail=f"Section '{sec_name}' in row {index+1} not found in database.")
+                
+            fac_uname = str(row["Faculty Username"]).strip() if "Faculty Username" in df.columns else ""
+            fac = None
+            if fac_uname and fac_uname.lower() != 'nan' and fac_uname.lower() != 'none' and fac_uname.lower() != '':
+                fac = db.query(models.Faculty).filter(models.Faculty.username == fac_uname).first()
+                if not fac:
+                    raise HTTPException(status_code=400, detail=f"Faculty Username '{fac_uname}' in row {index+1} not found in database.")
+            
+            try:
+                start_t = parse_time_string(row["Start Time"])
+                end_t = parse_time_string(row["End Time"])
+            except Exception:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid time format in row {index+1}: Start='{row['Start Time']}', End='{row['End Time']}'"
+                )
+                
+            entry = models.TimetableEntry(
+                version_id=version.id,
+                day_of_week=str(row["Day"]).strip(),
+                start_time=start_t,
+                end_time=end_t,
+                subject_id=subj.id,
+                section_id=sec.id,
+                faculty_id=fac.id if fac else None
+            )
+            db.add(entry)
+            added_count += 1
+            
+        db.commit()
+        return {
+            "status": "success", 
+            "message": f"Successfully imported {added_count} entries to Version {version.version}!", 
+            "version_id": version.id
+        }
+    except HTTPException as he:
+        db.rollback()
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error importing timetable: {str(e)}")
