@@ -7,28 +7,53 @@ from backend.core.config import settings
 detector_model = os.path.join(settings.BASE_DIR, 'backend', 'ml', 'models', 'face_detection_yunet.onnx')
 recognizer_model = os.path.join(settings.BASE_DIR, 'backend', 'ml', 'models', 'face_recognition_sface.onnx')
 
-# Initialize models if they exist (they are downloaded asynchronously)
+# Global caches to avoid reloading ONNX models on every frame (massively improves speed)
+_cached_detector = None
+_cached_detector_size = None
+_cached_recognizer = None
+
 def get_face_detector(input_size=(320, 320)):
-    if not os.path.exists(detector_model):
-        raise FileNotFoundError(f"Detector model not found at {detector_model}")
-    detector = cv2.FaceDetectorYN.create(
-        model=detector_model,
-        config="",
-        input_size=input_size,
-        score_threshold=0.9,
-        nms_threshold=0.3,
-        top_k=5000
-    )
-    return detector
+    global _cached_detector, _cached_detector_size
+    if _cached_detector is None:
+        if not os.path.exists(detector_model):
+            raise FileNotFoundError(f"Detector model not found at {detector_model}")
+        _cached_detector = cv2.FaceDetectorYN.create(
+            model=detector_model,
+            config="",
+            input_size=input_size,
+            score_threshold=0.9,
+            nms_threshold=0.3,
+            top_k=5000
+        )
+        _cached_detector_size = input_size
+    elif _cached_detector_size != input_size:
+        try:
+            _cached_detector.setInputSize(input_size)
+            _cached_detector_size = input_size
+        except Exception:
+            # Fallback if setInputSize fails on certain OpenCV versions
+            _cached_detector = cv2.FaceDetectorYN.create(
+                model=detector_model,
+                config="",
+                input_size=input_size,
+                score_threshold=0.9,
+                nms_threshold=0.3,
+                top_k=5000
+            )
+            _cached_detector_size = input_size
+            
+    return _cached_detector
 
 def get_face_recognizer():
-    if not os.path.exists(recognizer_model):
-        raise FileNotFoundError(f"Recognizer model not found at {recognizer_model}")
-    recognizer = cv2.FaceRecognizerSF.create(
-        model=recognizer_model,
-        config=""
-    )
-    return recognizer
+    global _cached_recognizer
+    if _cached_recognizer is None:
+        if not os.path.exists(recognizer_model):
+            raise FileNotFoundError(f"Recognizer model not found at {recognizer_model}")
+        _cached_recognizer = cv2.FaceRecognizerSF.create(
+            model=recognizer_model,
+            config=""
+        )
+    return _cached_recognizer
 
 def calculate_face_quality(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

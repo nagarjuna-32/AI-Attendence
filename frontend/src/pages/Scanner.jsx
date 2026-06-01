@@ -48,7 +48,7 @@ export default function Scanner() {
     };
     initCamera();
 
-    const interval = setInterval(processFrame, 1500);
+    const interval = setInterval(processFrame, 1000);
 
     return () => {
       clearInterval(interval);
