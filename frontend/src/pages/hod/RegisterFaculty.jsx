@@ -34,6 +34,11 @@ export default function RegisterFaculty() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Manual Subject Enhancement States
+  const [subjectMode, setSubjectMode] = useState('select'); // 'select' or 'manual'
+  const [manualSubjectName, setManualSubjectName] = useState('');
+  const [manualSubjectCode, setManualSubjectCode] = useState('');
 
   // We should ideally fetch the HOD's department, but for now we fetch the college's departments/courses.
   useEffect(() => {
@@ -65,8 +70,15 @@ export default function RegisterFaculty() {
       try {
         const secRes = await fetchWithAuth(`/architecture/semesters/${formData.semester_id}/sections`);
         const subRes = await fetchWithAuth(`/architecture/semesters/${formData.semester_id}/subjects`);
-        setSections(await secRes.json());
-        setSubjects(await subRes.json());
+        const secData = await secRes.json();
+        const subData = await subRes.json();
+        setSections(secData);
+        setSubjects(subData);
+        if (subData.length === 0) {
+          setSubjectMode('manual');
+        } else {
+          setSubjectMode('select');
+        }
       } catch (err) {}
     };
     loadSecSub();
@@ -83,12 +95,64 @@ export default function RegisterFaculty() {
     setError('');
     setSuccess('');
     
-    // Find subject code for payload
-    const selectedSubject = subjects.find(s => s.id == formData.subject_id);
-    
+    let finalSubjectId = formData.subject_id;
+    let finalSubjectCode = '';
+
+    if (subjectMode === 'manual') {
+      const trimmedName = manualSubjectName.trim();
+      if (!trimmedName) {
+        setError('Subject Name cannot be empty.');
+        setLoading(false);
+        return;
+      }
+      if (trimmedName.length < 3) {
+        setError('Subject Name must be at least 3 characters long.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Automatically create the subject first in the backend
+        const codeValue = manualSubjectCode.trim() || `SUB_${Date.now()}`;
+        const createRes = await fetchWithAuth(`/architecture/semesters/${formData.semester_id}/subjects`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: trimmedName,
+            code: codeValue
+          })
+        });
+
+        if (!createRes.ok) {
+          const createData = await createRes.json();
+          setError(createData.detail || 'Failed to create manual subject.');
+          setLoading(false);
+          return;
+        }
+
+        const newSub = await createRes.json();
+        finalSubjectId = newSub.id;
+        finalSubjectCode = newSub.code;
+      } catch (err) {
+        setError('Failed to create manual subject due to network error.');
+        setLoading(false);
+        return;
+      }
+    } else {
+      if (!formData.subject_id) {
+        setError('Please select a subject.');
+        setLoading(false);
+        return;
+      }
+      const selectedSubject = subjects.find(s => s.id == formData.subject_id);
+      finalSubjectCode = selectedSubject ? selectedSubject.code : '';
+    }
+
     const payload = {
       ...formData,
-      subject_code: selectedSubject ? selectedSubject.code : '',
+      subject_id: parseInt(finalSubjectId),
+      subject_code: finalSubjectCode,
+      subject_taught: subjectMode === 'manual' ? manualSubjectName.trim() : (formData.subject_taught || ''),
       experience: parseInt(formData.experience) || 0
     };
 
@@ -229,13 +293,82 @@ export default function RegisterFaculty() {
                   {semesters.map(s => <option key={s.id} value={s.id}>Semester {s.number}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Subject</label>
-                <select required name="subject_id" value={formData.subject_id} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 focus:border-cyan-500 outline-none" disabled={!formData.semester_id}>
-                  <option value="">Select Subject</option>
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
+              {formData.semester_id && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm text-slate-400 mb-2 font-medium">Subject Assignment Mode</label>
+                  <div className="flex gap-6 p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl max-w-md">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-300">
+                      <input 
+                        type="radio" 
+                        name="subjectMode" 
+                        value="select" 
+                        checked={subjectMode === 'select'} 
+                        onChange={() => setSubjectMode('select')}
+                        disabled={subjects.length === 0}
+                        className="accent-indigo-500 animate-pulse"
+                      />
+                      Select Existing Subject
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold text-slate-300">
+                      <input 
+                        type="radio" 
+                        name="subjectMode" 
+                        value="manual" 
+                        checked={subjectMode === 'manual'} 
+                        onChange={() => setSubjectMode('manual')}
+                        className="accent-indigo-500 animate-pulse"
+                      />
+                      Enter Subject Manually
+                    </label>
+                  </div>
+                  {subjects.length === 0 && (
+                    <p className="text-amber-400 text-xs mt-2 flex items-center gap-1.5 font-medium">
+                      <AlertCircle size={14} className="animate-pulse" /> No subjects available. Enter subject manually.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {subjectMode === 'select' ? (
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Subject *</label>
+                  <select 
+                    required={subjectMode === 'select'} 
+                    name="subject_id" 
+                    value={formData.subject_id} 
+                    onChange={handleChange} 
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 focus:border-cyan-500 outline-none" 
+                    disabled={!formData.semester_id}
+                  >
+                    <option value="">Select Subject</option>
+                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Subject Name *</label>
+                    <input 
+                      required={subjectMode === 'manual'} 
+                      type="text" 
+                      value={manualSubjectName} 
+                      onChange={e => setManualSubjectName(e.target.value)} 
+                      placeholder="Example: Artificial Intelligence" 
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 focus:border-cyan-500 outline-none text-white font-medium" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Subject Code (Optional)</label>
+                    <input 
+                      type="text" 
+                      value={manualSubjectCode} 
+                      onChange={e => setManualSubjectCode(e.target.value)} 
+                      placeholder="Example: 21CS42" 
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 focus:border-cyan-500 outline-none text-white font-medium" 
+                    />
+                  </div>
+                </>
+              )}
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Section</label>
                 <select required name="section_id" value={formData.section_id} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 focus:border-cyan-500 outline-none" disabled={!formData.semester_id}>

@@ -22,6 +22,10 @@ class HODCreate(BaseModel):
 class HODUpdate(BaseModel):
     full_name: str
 
+class SubjectCreate(BaseModel):
+    code: str
+    name: str
+
 @router.get("/departments")
 def get_departments(db: Session = Depends(get_db)):
     departments = db.query(Department).all()
@@ -107,6 +111,27 @@ def get_sections(sem_id: int, db: Session = Depends(get_db)):
 @router.get("/semesters/{sem_id}/subjects")
 def get_subjects(sem_id: int, db: Session = Depends(get_db)):
     return db.query(Subject).filter(Subject.semester_id == sem_id).all()
+
+@router.post("/semesters/{sem_id}/subjects")
+def create_subject(sem_id: int, sub: SubjectCreate, db: Session = Depends(get_db)):
+    semester = db.query(Semester).filter(Semester.id == sem_id).first()
+    if not semester:
+        raise HTTPException(status_code=404, detail="Semester not found")
+        
+    # Check if a subject with this code or name already exists in this semester
+    existing = db.query(Subject).filter(
+        (Subject.semester_id == sem_id) & 
+        ((Subject.code == sub.code) | (Subject.name == sub.name))
+    ).first()
+    
+    if existing:
+        return existing
+        
+    new_sub = Subject(code=sub.code, name=sub.name, semester_id=sem_id)
+    db.add(new_sub)
+    db.commit()
+    db.refresh(new_sub)
+    return new_sub
 
 @router.get("/faculty/{faculty_id}/assignments")
 def get_faculty_assignments(faculty_id: int, db: Session = Depends(get_db)):
