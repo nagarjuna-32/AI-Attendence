@@ -27,12 +27,12 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-  allow_origins=[
-    "https://ai-attendence-beta.vercel.app",
-    "https://ai-attendence-git-main-acarjunarjus-projects.vercel.app",
-    "https://ai-attendence-9iveqc09g-acarjunarjus-projects.vercel.app",
-    "http://localhost:5173",
-]
+    allow_origins=[
+        "https://ai-attendence-beta.vercel.app",
+        "https://ai-attendence-git-main-acarjunarjus-projects.vercel.app",
+        "https://ai-attendence-9iveqc09g-acarjunarjus-projects.vercel.app",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
