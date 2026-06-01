@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../../components/Layout';
 import { StatCard } from '../../components/ui/StatCard';
-import { Users, Building2, Calendar, FileText, CheckCircle2, Download, AlertTriangle, Filter, Bell, UserPlus } from 'lucide-react';
+import { Users, Building2, Calendar, FileText, CheckCircle2, Download, AlertTriangle, Filter, Bell, UserPlus, Edit2, X } from 'lucide-react';
 import { fetchWithAuth, API_BASE } from '../../utils/api';
 import {
   Chart as ChartJS,
@@ -25,6 +25,7 @@ export default function PrincipalDashboard() {
   const [alertsSummary, setAlertsSummary] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [assignHodModal, setAssignHodModal] = useState({ show: false, deptId: null, deptName: '' });
+  const [editHodModal, setEditHodModal] = useState({ show: false, deptId: null, deptName: '', hodName: '' });
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   
   const [selectedDept, setSelectedDept] = useState('');
@@ -289,8 +290,17 @@ export default function PrincipalDashboard() {
                   </div>
                   <div className="text-sm text-slate-400 mt-4 font-medium">Assigned HOD:</div>
                   {dept.hod_name ? (
-                    <div className="text-emerald-400 font-bold flex items-center gap-2 mt-1.5">
-                      <CheckCircle2 size={16} /> {dept.hod_name}
+                    <div className="flex justify-between items-center mt-1.5">
+                      <div className="text-emerald-400 font-bold flex items-center gap-2">
+                        <CheckCircle2 size={16} /> {dept.hod_name}
+                      </div>
+                      <button 
+                        onClick={() => setEditHodModal({ show: true, deptId: dept.id, deptName: dept.name, hodName: dept.hod_name })}
+                        className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-all"
+                        title="Edit HOD Name"
+                      >
+                        <Edit2 size={14} />
+                      </button>
                     </div>
                   ) : (
                     <div className="text-rose-400/80 italic mt-1.5 flex items-center gap-1.5">
@@ -626,6 +636,73 @@ export default function PrincipalDashboard() {
                 </button>
                 <button type="submit" className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-all">
                   Save HOD
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit HOD Name Modal */}
+      {editHodModal.show && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md relative">
+            <button 
+              onClick={() => setEditHodModal({ show: false, deptId: null, deptName: '', hodName: '' })} 
+              className="absolute top-4 right-4 text-slate-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            <h3 className="text-2xl font-bold text-white mb-2">Edit HOD Name</h3>
+            <p className="text-slate-400 mb-6">for {editHodModal.deptName}</p>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                const res = await fetchWithAuth(`/architecture/departments/${editHodModal.deptId}/hod`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ full_name: editHodModal.hodName })
+                });
+                
+                if (res.ok) {
+                  const data = await res.json();
+                  // Update local state
+                  setDepartments(departments.map(d => 
+                    d.id === editHodModal.deptId ? { ...d, hod_name: data.hod_name } : d
+                  ));
+                  setEditHodModal({ show: false, deptId: null, deptName: '', hodName: '' });
+                } else {
+                  const err = await res.json();
+                  alert(`Failed: ${err.detail || 'Unknown error'}`);
+                }
+              } catch (error) {
+                alert("Network error");
+              }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm text-slate-400 mb-1">HOD Full Name</label>
+                <input 
+                  required 
+                  type="text" 
+                  value={editHodModal.hodName} 
+                  onChange={e => setEditHodModal({ ...editHodModal, hodName: e.target.value })} 
+                  className="w-full bg-black/50 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none" 
+                />
+              </div>
+              <div className="flex gap-4 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setEditHodModal({ show: false, deptId: null, deptName: '', hodName: '' })} 
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-all"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>

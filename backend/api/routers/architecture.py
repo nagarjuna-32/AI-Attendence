@@ -19,6 +19,9 @@ class HODCreate(BaseModel):
     password: str
     full_name: str
 
+class HODUpdate(BaseModel):
+    full_name: str
+
 @router.get("/departments")
 def get_departments(db: Session = Depends(get_db)):
     departments = db.query(Department).all()
@@ -74,6 +77,20 @@ def create_hod(dept_id: int, hod_data: HODCreate, db: Session = Depends(get_db))
     db.commit()
     db.refresh(new_hod)
     return {"message": "HOD created successfully", "hod_name": new_hod.full_name}
+
+@router.put("/departments/{dept_id}/hod")
+def update_hod(dept_id: int, hod_data: HODUpdate, db: Session = Depends(get_db)):
+    dept = db.query(Department).filter(Department.id == dept_id).first()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+        
+    if not dept.hod:
+        raise HTTPException(status_code=400, detail="No HOD assigned to this department")
+        
+    dept.hod.full_name = hod_data.full_name
+    db.commit()
+    db.refresh(dept.hod)
+    return {"message": "HOD name updated successfully", "hod_name": dept.hod.full_name}
 
 @router.get("/departments/{dept_id}/courses")
 def get_courses(dept_id: int, db: Session = Depends(get_db)):
