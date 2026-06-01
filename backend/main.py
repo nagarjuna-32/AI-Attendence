@@ -28,16 +28,15 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-    "https://ai-attendence-beta.vercel.app",
-    "https://ai-attendence-git-main-acarjunarjus-projects.vercel.app",
-    "https://ai-attendence-8yeaf6f6q-acarjunarjus-projects.vercel.app",
-    "http://localhost:5173",
+        "https://ai-attendence-beta.vercel.app",
+        "https://ai-attendence-8yeaf6f6q-acarjunarjus-projects.vercel.app",
+        "https://ai-attendence-git-main-acarjunarjus-projects.vercel.app",
+        "http://localhost:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(students.router, prefix="/api/v1/students", tags=["Students"])
