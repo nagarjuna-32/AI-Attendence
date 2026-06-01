@@ -27,7 +27,7 @@ app = FastAPI(
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-   allow_origins=[
+  allow_origins=[
     "https://ai-attendence-beta.vercel.app",
     "https://ai-attendence-git-main-acarjunarjus-projects.vercel.app",
     "https://ai-attendence-9iveqc09g-acarjunarjus-projects.vercel.app",
