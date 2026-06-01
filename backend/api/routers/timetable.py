@@ -11,6 +11,17 @@ from backend.api import deps
 
 router = APIRouter()
 
+def parse_time_string(val):
+    val_str = str(val).strip()
+    # Handle direct time or datetime stringification formats
+    for fmt in ("%H:%M:%S", "%H:%M", "%I:%M %p", "%I:%M:%S %p"):
+        try:
+            return datetime.strptime(val_str, fmt).time()
+        except ValueError:
+            pass
+    # If the string contains only hours/minutes
+    raise ValueError(f"Unable to parse time: {val}")
+
 @router.post("/upload")
 async def upload_timetable(
     file: UploadFile = File(...),
@@ -52,19 +63,34 @@ async def upload_timetable(
         db.flush()
         
         for index, row in df.iterrows():
-            subj = db.query(models.Subject).filter(models.Subject.code == str(row["Subject Code"])).first()
+            subj = db.query(models.Subject).filter(models.Subject.code == str(row["Subject Code"]).strip()).first()
             if not subj: continue
                 
-            sec = db.query(models.Section).filter(models.Section.name == str(row["Section"])).first()
+            sec = db.query(models.Section).filter(models.Section.name == str(row["Section"]).strip()).first()
             if not sec: continue
                 
-            fac = db.query(models.Faculty).filter(models.Faculty.username == str(row["Faculty Username"])).first()
+            fac = db.query(models.Faculty).filter(models.Faculty.username == str(row["Faculty Username"]).strip()).first()
             
+            try:
+                start_t = parse_time_string(row["Start Time"])
+                end_t = parse_time_string(row["End Time"])
+            except ValueError:
+                # If Excel reads it as datetime object directly
+                if hasattr(row["Start Time"], "time"):
+                    start_t = row["Start Time"].time()
+                else:
+                    start_t = parse_time_string(str(row["Start Time"]))
+                
+                if hasattr(row["End Time"], "time"):
+                    end_t = row["End Time"].time()
+                else:
+                    end_t = parse_time_string(str(row["End Time"]))
+
             entry = models.TimetableEntry(
                 version_id=new_version.id,
                 day_of_week=str(row["Day"]).strip(),
-                start_time=datetime.strptime(str(row["Start Time"]).strip(), "%H:%M").time(),
-                end_time=datetime.strptime(str(row["End Time"]).strip(), "%H:%M").time(),
+                start_time=start_t,
+                end_time=end_t,
                 subject_id=subj.id,
                 section_id=sec.id,
                 faculty_id=fac.id if fac else None
@@ -153,3 +179,49 @@ def delete_entry(
     db.delete(entry)
     db.commit()
     return {"status": "success", "message": "Entry deleted"}
+
+@router.post("/new-version")
+def create_new_version(db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    if current_user.role != "hod":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    last_version = db.query(models.TimetableVersion).filter(
+        models.TimetableVersion.department_id == current_user.department_id
+    ).order_by(models.TimetableVersion.version.desc()).first()
+    v_num = (last_version.version + 1) if last_version else 1
+    
+    new_version = models.TimetableVersion(
+        department_id=current_user.department_id,
+        version=v_num,
+        status="Draft",
+        created_by=current_user.id
+    )
+    db.add(new_version)
+    db.commit()
+    db.refresh(new_version)
+    return {"status": "success", "message": "Draft version created successfully.", "version_id": new_version.id}
+
+@router.post("/entry")
+def create_entry(data: dict, db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    if current_user.role != "hod":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    try:
+        start_t = datetime.strptime(data["start_time"], "%H:%M").time()
+        end_t = datetime.strptime(data["end_time"], "%H:%M").time()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+        
+    entry = models.TimetableEntry(
+        version_id=data["version_id"],
+        day_of_week=data["day_of_week"],
+        start_time=start_t,
+        end_time=end_t,
+        subject_id=data["subject_id"],
+        section_id=data["section_id"],
+        faculty_id=data.get("faculty_id")
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return {"status": "success", "message": "Timetable entry added successfully.", "entry_id": entry.id}

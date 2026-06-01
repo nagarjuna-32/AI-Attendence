@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
+import Login from './pages/Login';
 import Registration from './pages/Registration';
+import Scanner from './pages/Scanner';
 
 // Portals
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -17,8 +19,8 @@ import ManualAttendance from './pages/ManualAttendance';
 // Ensure standard authentication wrapper (simulated for now based on role localstorage)
 const ProtectedRoute = ({ children, role }) => {
   const currentRole = localStorage.getItem('role');
-  if (!currentRole || currentRole !== role) {
-    return <Navigate to="/" replace />;
+  if (!currentRole || currentRole.toLowerCase() !== role.toLowerCase()) {
+    return <Navigate to="/login" replace />;
   }
   return children;
 };
@@ -28,6 +30,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Registration />} />
         
         {/* Admin Portal (Legacy/Technical) */}
@@ -55,9 +58,10 @@ function App() {
         <Route path="/faculty" element={
           <ProtectedRoute role="faculty"><FacultyDashboard /></ProtectedRoute>
         } />
-        <Route path="/faculty/scanner" element={
+        <Route path="/faculty/bulk-scanner" element={
           <ProtectedRoute role="faculty"><BulkScanner /></ProtectedRoute>
         } />
+        <Route path="/scanner" element={<Scanner />} />
         <Route path="/faculty/manual" element={
           <ProtectedRoute role="faculty"><ManualAttendance /></ProtectedRoute>
         } />

@@ -69,10 +69,10 @@ export default function Home() {
           className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
         >
           <button 
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/scanner')}
             className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-full font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-[0_0_30px_rgba(79,70,229,0.4)] transition-all hover:-translate-y-1"
           >
-            Access Portal <ChevronRight size={20} />
+            <ScanFace size={20} /> Mark Attendance
           </button>
           <button 
             onClick={() => navigate('/register')}
@@ -104,7 +104,14 @@ export default function Home() {
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
               className="glass-card p-8 group cursor-pointer"
-              onClick={() => navigate('/login')}
+              onClick={() => {
+                if (item.role === 'Student') {
+                  navigate('/register');
+                } else {
+                  const roleId = item.role === 'Principal' ? 'principal' : item.role === 'Head of Dept' ? 'hod' : 'faculty';
+                  navigate('/login', { state: { role: roleId } });
+                }
+              }}
             >
               <div className={`w-14 h-14 rounded-2xl ${item.bg} ${item.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
                 <item.icon size={28} />

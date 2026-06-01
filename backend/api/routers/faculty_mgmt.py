@@ -102,11 +102,21 @@ def register_faculty(payload: FacultyRegistrationSchema, db: Session = Depends(g
     return {"status": "success", "message": "Faculty registered successfully.", "faculty_id": new_faculty.id}
 
 @router.get("/department")
-def get_department_faculty(db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
-    if current_user.role != "hod":
+def get_department_faculty(department_id: Optional[int] = None, db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    if current_user.role not in ["hod", "principal", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
         
-    faculty = db.query(models.Faculty).filter(models.Faculty.department_id == current_user.department_id).all()
+    target_dept_id = None
+    if current_user.role == "hod":
+        target_dept_id = current_user.department_id
+    else:
+        target_dept_id = department_id
+        
+    if not target_dept_id:
+        faculty = db.query(models.Faculty).all()
+    else:
+        faculty = db.query(models.Faculty).filter(models.Faculty.department_id == target_dept_id).all()
+        
     result = []
     for f in faculty:
         result.append({
@@ -115,7 +125,8 @@ def get_department_faculty(db: Session = Depends(get_db), current_user = Depends
             "faculty_id": f.faculty_id,
             "email": f.email,
             "designation": f.designation,
-            "status": f.status
+            "status": f.status,
+            "department": f.department.name if f.department else "N/A"
         })
     return result
 
@@ -147,3 +158,43 @@ def get_my_courses(db: Session = Depends(get_db), current_user = Depends(deps.ge
     if current_user.role != "hod":
         raise HTTPException(status_code=403, detail="Unauthorized")
     return db.query(models.Course).filter(models.Course.department_id == current_user.department_id).all()
+
+@router.delete("/faculty/{fac_id}")
+def delete_faculty(fac_id: int, db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    if current_user.role != "hod":
+        raise HTTPException(status_code=403, detail="Only HODs can remove faculty members.")
+        
+    faculty_member = db.query(models.Faculty).filter(
+        models.Faculty.id == fac_id,
+        models.Faculty.department_id == current_user.department_id
+    ).first()
+    
+    if not faculty_member:
+        raise HTTPException(status_code=404, detail="Faculty member not found.")
+        
+    # Delete faculty subjects assignments
+    db.query(models.FacultySubject).filter(models.FacultySubject.faculty_id == fac_id).delete()
+    
+    # Delete timetable entries associated with this faculty
+    db.query(models.TimetableEntry).filter(models.TimetableEntry.faculty_id == fac_id).delete()
+    
+    # Create notification and activity log
+    db.add(models.Notification(
+        title="Faculty Member Removed",
+        description=f"Faculty {faculty_member.full_name} was removed by HOD.",
+        type="FACULTY_REMOVAL",
+        target_role="principal",
+        created_by=current_user.id
+    ))
+    
+    db.add(models.ActivityLog(
+        activity_type="FACULTY_REMOVED",
+        description=f"Removed faculty: {faculty_member.full_name} ({faculty_member.faculty_id})",
+        department_id=current_user.department_id,
+        performed_by=current_user.id,
+        role="hod"
+    ))
+    
+    db.delete(faculty_member)
+    db.commit()
+    return {"status": "success", "message": "Faculty member removed successfully."}

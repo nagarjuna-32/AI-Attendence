@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 import json
 import cv2
 import numpy as np
@@ -82,16 +82,12 @@ async def register_student(
     if not dept_obj:
         raise HTTPException(status_code=400, detail="Invalid department code")
         
-    course_obj = db.query(models.Course).filter(models.Course.department_id == dept_obj.id).first()
-    if not course_obj:
-        raise HTTPException(status_code=400, detail="Course not found for department")
-        
-    sem_obj = db.query(models.Semester).filter(
-        models.Semester.course_id == course_obj.id,
+    sem_obj = db.query(models.Semester).join(models.Course).filter(
+        models.Course.department_id == dept_obj.id,
         models.Semester.number == int(semester)
     ).first()
     if not sem_obj:
-        raise HTTPException(status_code=400, detail="Semester not found")
+        raise HTTPException(status_code=400, detail="Semester not found for this department")
     
     sec_obj = db.query(models.Section).filter(
         models.Section.semester_id == sem_obj.id,
@@ -126,3 +122,38 @@ async def register_student(
 def get_students(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     students = db.query(models.Student).offset(skip).limit(limit).all()
     return students
+
+@router.get("/department")
+def get_department_students(department_id: Optional[int] = None, db: Session = Depends(get_db), current_user = Depends(deps.get_current_user)):
+    if current_user.role not in ["hod", "principal", "admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+        
+    target_dept_id = None
+    if current_user.role == "hod":
+        target_dept_id = current_user.department_id
+    else:
+        target_dept_id = department_id
+        
+    query = db.query(models.Student)
+    if target_dept_id:
+        dept_obj = db.query(models.Department).filter(models.Department.id == target_dept_id).first()
+        if dept_obj:
+            query = query.filter(
+                models.Student.department.ilike(f"%{dept_obj.name}%") | 
+                models.Student.section_obj.has(models.Section.semester.has(models.Semester.course.has(models.Course.department_id == target_dept_id)))
+            )
+            
+    students = query.all()
+    result = []
+    for s in students:
+        result.append({
+            "id": s.id,
+            "name": s.full_name,
+            "usn": s.usn,
+            "email": s.email,
+            "phone": s.phone,
+            "semester": s.semester,
+            "section": s.section,
+            "registered_at": s.registered_at.strftime("%Y-%m-%d") if s.registered_at else "N/A"
+        })
+    return result

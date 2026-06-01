@@ -15,18 +15,49 @@ export default function HODDashboard() {
   });
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedSem, setSelectedSem] = useState('');
+  const [facultyList, setFacultyList] = useState([]);
+  const [studentList, setStudentList] = useState([]);
+
+  const loadData = async () => {
+    try {
+      const res = await fetchWithAuth('/alerts/metrics/hod');
+      if (res && res.ok) {
+        setMetrics(await res.json());
+      }
+    } catch (err) {}
+    try {
+      const fRes = await fetchWithAuth('/faculty_mgmt/department');
+      if (fRes && fRes.ok) {
+        setFacultyList(await fRes.json());
+      }
+    } catch (err) {}
+    try {
+      const sRes = await fetchWithAuth('/students/department');
+      if (sRes && sRes.ok) {
+        setStudentList(await sRes.json());
+      }
+    } catch (err) {}
+  };
 
   useEffect(() => {
-    const loadAlerts = async () => {
-      try {
-        const res = await fetchWithAuth('/alerts/metrics/hod');
-        if (res && res.ok) {
-          setMetrics(await res.json());
-        }
-      } catch (err) {}
-    };
-    loadAlerts();
+    loadData();
   }, []);
+
+  const handleDeleteFaculty = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to remove faculty member "${name}"?`)) return;
+    try {
+      const res = await fetchWithAuth(`/faculty_mgmt/faculty/${id}`, { method: 'DELETE' });
+      if (res && res.ok) {
+        setFacultyList(prev => prev.filter(f => f.id !== id));
+        alert("Faculty member removed successfully!");
+      } else {
+        const err = await res.json();
+        alert(err.detail || "Failed to remove faculty member");
+      }
+    } catch (err) {
+      alert("Network error");
+    }
+  };
 
   const handleExport = (format) => {
     let url = `${API_BASE}/analytics/export?format=${format}`;
@@ -76,10 +107,10 @@ export default function HODDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Department Students" value="840" icon={Users} color="emerald" delay={0.1} />
-        <StatCard title="Faculty Count" value="42" icon={BookOpen} color="cyan" delay={0.2} />
-        <StatCard title="Defaulters (<75%)" value="12" icon={AlertTriangle} color="rose" delay={0.3} />
-        <StatCard title="Active Subjects" value="24" icon={Calendar} color="indigo" delay={0.4} />
+        <StatCard title="Department Students" value={studentList.length.toString()} icon={Users} color="emerald" delay={0.1} />
+        <StatCard title="Faculty Count" value={facultyList.length.toString()} icon={BookOpen} color="cyan" delay={0.2} />
+        <StatCard title="Defaulters (<75%)" value="0" icon={AlertTriangle} color="rose" delay={0.3} />
+        <StatCard title="Active Subjects" value="6" icon={Calendar} color="indigo" delay={0.4} />
       </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -162,6 +193,109 @@ export default function HODDashboard() {
               <div className="text-xl font-bold text-cyan-400 mt-2">{metrics.last_alert_date}</div>
             </div>
           </div>
+        </div>
+
+        {/* Faculty Management Section */}
+        <div className="mt-8 glass-panel p-6 border-t-2 border-emerald-500/50">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-3">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+              <Users size={20} className="text-emerald-400" /> Faculty Management
+            </h2>
+            <button 
+              onClick={() => navigate('/hod/register-faculty')}
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-3.5 py-1.5 rounded-lg border border-emerald-500/30 flex items-center gap-1.5 transition-all font-semibold text-xs"
+            >
+              <UserPlus size={14} /> Add Faculty
+            </button>
+          </div>
+          
+          {facultyList.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-sm">No faculty members registered in this department yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950/40 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">Faculty ID</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Designation</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/40">
+                  {facultyList.map(f => (
+                    <tr key={f.id} className="hover:bg-slate-900/30 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-white">{f.name}</td>
+                      <td className="py-3.5 px-4 font-mono text-cyan-400 text-xs">{f.faculty_id}</td>
+                      <td className="py-3.5 px-4">{f.email}</td>
+                      <td className="py-3.5 px-4">{f.designation}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          {f.status}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button 
+                          onClick={() => handleDeleteFaculty(f.id, f.name)}
+                          className="px-2.5 py-1 text-xs bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/20 rounded-md transition-colors font-medium"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Student Management Section */}
+        <div className="mt-8 glass-panel p-6 border-t-2 border-indigo-500/50">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-700/50 pb-3">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+              <Users size={20} className="text-indigo-400" /> Student Directory
+            </h2>
+            <button 
+              onClick={() => navigate('/register')}
+              className="bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-3.5 py-1.5 rounded-lg border border-indigo-500/30 flex items-center gap-1.5 transition-all font-semibold text-xs"
+            >
+              <UserPlus size={14} /> Add Student
+            </button>
+          </div>
+          
+          {studentList.length === 0 ? (
+            <div className="text-center py-8 text-slate-500 text-sm">No students registered in this department yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-950/40 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Name</th>
+                    <th className="py-3 px-4">USN</th>
+                    <th className="py-3 px-4">Semester</th>
+                    <th className="py-3 px-4">Section</th>
+                    <th className="py-3 px-4">Email</th>
+                    <th className="py-3 px-4">Registered Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/40">
+                  {studentList.map(s => (
+                    <tr key={s.id} className="hover:bg-slate-900/30 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-white">{s.name}</td>
+                      <td className="py-3.5 px-4 font-mono text-cyan-400 text-xs">{s.usn}</td>
+                      <td className="py-3.5 px-4">Semester {s.semester}</td>
+                      <td className="py-3.5 px-4">Section {s.section}</td>
+                      <td className="py-3.5 px-4">{s.email || 'N/A'}</td>
+                      <td className="py-3.5 px-4 text-xs font-mono text-slate-400">{s.registered_at}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Report Generation Section */}

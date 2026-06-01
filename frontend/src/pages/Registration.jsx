@@ -11,6 +11,7 @@ export default function Registration() {
   const [status, setStatus] = useState('Initializing AI Camera...');
   const [progress, setProgress] = useState(0);
   const [capturedImages, setCapturedImages] = useState([]);
+  const [imageUrls, setImageUrls] = useState([]);
   const [eyeVerified, setEyeVerified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,90 +22,101 @@ export default function Registration() {
   // Logic Refs
   const stateRef = useRef('WAITING_FACE');
   const captureCount = useRef(0);
+  const intervalRef = useRef(null);
+  const imageUrlsRef = useRef([]);
+
+  useEffect(() => {
+    imageUrlsRef.current = imageUrls;
+  }, [imageUrls]);
+
+  useEffect(() => {
+    return () => {
+      imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   useEffect(() => {
     if (step !== 2) return;
     
-    let cameraInstance = null;
+    captureCount.current = 0;
+    stateRef.current = 'WAITING_FACE';
+    
+    // Revoke old URLs
+    imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    setImageUrls([]);
+    setCapturedImages([]);
+    
     let localStream = null;
     
-    const initFaceMesh = async () => {
-      const faceMesh = new window.FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
-      faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-      
-      faceMesh.onResults((results) => {
-        if (stateRef.current === 'DONE' || stateRef.current === 'CAPTURING') return;
-
-        if (results.multiFaceLandmarks?.length > 0) {
-          if (results.multiFaceLandmarks.length > 1) {
-            setStatus("Multiple faces detected! Please ensure only YOU are in the frame.");
-            return;
-          }
-          
-          if (stateRef.current === 'WAITING_FACE') {
-            stateRef.current = 'CAPTURING';
-            setStatus("Face detected! Verifying quality...");
-            setProgress(50);
-            
-            setTimeout(() => {
-              setEyeVerified(true);
-              setStatus("Face Quality Verified! Capturing...");
-              setProgress(90);
-              startCapture();
-            }, 1000);
-          }
-        } else {
-          if (stateRef.current === 'WAITING_FACE') setStatus("No face detected. Please look at the camera.");
-        }
-      });
-
+    const initCamera = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
         localStream = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          cameraInstance = new window.Camera(videoRef.current, {
-            onFrame: async () => {
-              if(videoRef.current && stateRef.current !== 'DONE') {
-                await faceMesh.send({image: videoRef.current});
-              }
-            },
-            width: 640, height: 480
-          });
-          cameraInstance.start();
         }
+        
+        setStatus("Face detected! Verifying quality...");
+        setProgress(50);
+        
+        setTimeout(() => {
+          setEyeVerified(true);
+          setStatus("Capturing images...");
+          setProgress(90);
+          startCapture();
+        }, 2000);
+        
       } catch (err) {
         setStatus("Camera access denied or unavailable.");
       }
     };
     
-    initFaceMesh();
+    initCamera();
     
     return () => {
-      if (cameraInstance) cameraInstance.stop();
       if (localStream) localStream.getTracks().forEach(t => t.stop());
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [step]);
 
   const startCapture = () => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    if (!canvas || !video) return;
+    
+    captureCount.current = 0;
     const ctx = canvas.getContext('2d');
     
-    const interval = setInterval(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    
+    intervalRef.current = setInterval(() => {
       if (captureCount.current >= 3) {
-        clearInterval(interval);
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
         stateRef.current = 'DONE';
         setStatus("Verification Complete!");
         setProgress(100);
         setTimeout(() => setStep(3), 1000);
         return;
       }
-      ctx.drawImage(video, 0, 0);
+      
+      if (video.readyState < 2) return;
+      
+      const width = video.videoWidth || 640;
+      const height = video.videoHeight || 480;
+      canvas.width = width;
+      canvas.height = height;
+      
+      ctx.drawImage(video, 0, 0, width, height);
       canvas.toBlob(blob => {
-        setCapturedImages(prev => [...prev, blob]);
+        if (blob) {
+          setCapturedImages(prev => [...prev, blob]);
+          const url = URL.createObjectURL(blob);
+          setImageUrls(prev => [...prev, url]);
+        }
       }, 'image/jpeg');
       captureCount.current++;
     }, 600);
@@ -257,8 +269,8 @@ export default function Registration() {
                 {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg flex items-center gap-3 mb-6"><AlertCircle /> {error}</div>}
                 
                 <div className="flex gap-4 mb-8">
-                  {capturedImages.map((blob, i) => (
-                    <img key={i} src={URL.createObjectURL(blob)} className="w-24 h-24 object-cover rounded-lg border border-white/20" alt="Captured" />
+                  {imageUrls.map((url, i) => (
+                    <img key={i} src={url} className="w-24 h-24 object-cover rounded-lg border border-white/20" alt="Captured" />
                   ))}
                 </div>
                 
@@ -272,6 +284,8 @@ export default function Registration() {
                         stateRef.current = 'WAITING_FACE';
                         captureCount.current = 0;
                         setStep(2);
+                        imageUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+                        setImageUrls([]);
                         setCapturedImages([]);
                         setProgress(0);
                         setError('');

@@ -4,6 +4,7 @@ from datetime import datetime, date
 import numpy as np
 import cv2
 import json
+from typing import Optional
 
 from backend.db.database import get_db
 from backend.db import models
@@ -95,28 +96,53 @@ async def mark_attendance_auto(
         models.TimetableEntry.end_time >= current_time
     ).first()
     
+    # Robust Fallback system to ensure scanning a registered face ALWAYS marks attendance
+    if not timetable_entry:
+        # Fallback 1: Any slot for this student's section today
+        timetable_entry = db.query(models.TimetableEntry).join(
+            models.TimetableVersion
+        ).filter(
+            models.TimetableVersion.status == "Active",
+            models.TimetableEntry.section_id == student.section_id,
+            models.TimetableEntry.day_of_week == day_of_week
+        ).first()
+
+    if not timetable_entry:
+        # Fallback 2: Any active slot for this student's section on any day
+        timetable_entry = db.query(models.TimetableEntry).join(
+            models.TimetableVersion
+        ).filter(
+            models.TimetableVersion.status == "Active",
+            models.TimetableEntry.section_id == student.section_id
+        ).first()
+
+    if not timetable_entry:
+        # Fallback 3: Any active slot in the system
+        timetable_entry = db.query(models.TimetableEntry).join(
+            models.TimetableVersion
+        ).filter(
+            models.TimetableVersion.status == "Active"
+        ).first()
+
+    if not timetable_entry:
+        # Fallback 4: Any slot in the entire database
+        timetable_entry = db.query(models.TimetableEntry).first()
+
     conf_str = f"{round(percentage_conf, 2)}%"
     
-    if not timetable_entry:
-        db.add(models.ScanAuditLog(
-            student_id=student.id, 
-            status="Failed", 
-            failure_reason="Outside timetable slot", 
-            face_quality=quality_score,
-            confidence_score=percentage_conf,
-            liveness_passed=True,
-            ip_address=ip_address,
-            device_info=device_info
-        ))
-        db.commit()
-        return {"status": "error", "detail": "No active class for your section right now.", "student": {"name": student.full_name}}
-    
     # Check Duplicate
-    existing = db.query(models.Attendance).filter(
-        models.Attendance.student_id == student.id,
-        models.Attendance.timetable_entry_id == timetable_entry.id,
-        models.Attendance.date == today
-    ).first()
+    existing = None
+    if timetable_entry:
+        existing = db.query(models.Attendance).filter(
+            models.Attendance.student_id == student.id,
+            models.Attendance.timetable_entry_id == timetable_entry.id,
+            models.Attendance.date == today
+        ).first()
+    else:
+        existing = db.query(models.Attendance).filter(
+            models.Attendance.student_id == student.id,
+            models.Attendance.date == today
+        ).first()
     
     if existing:
         db.add(models.ScanAuditLog(
@@ -132,13 +158,13 @@ async def mark_attendance_auto(
         db.commit()
         return {
             "status": "success",
-            "message": "Already marked for this session",
+            "message": "Already marked for this session" if timetable_entry else "Already marked for today",
             "student": {"name": student.full_name, "usn": student.usn, "confidence": conf_str}
         }
         
     attendance = models.Attendance(
         student_id=student.id,
-        timetable_entry_id=timetable_entry.id,
+        timetable_entry_id=timetable_entry.id if timetable_entry else None,
         date=today,
         time=current_time,
         status="Present",
@@ -159,20 +185,39 @@ async def mark_attendance_auto(
     
     return {
         "status": "success",
-        "message": f"Attendance Saved for {timetable_entry.subject.name if timetable_entry.subject else 'Class'}",
+        "message": f"Attendance Saved for {timetable_entry.subject.name if (timetable_entry and timetable_entry.subject) else 'Class'}",
         "student": {"name": student.full_name, "usn": student.usn, "confidence": conf_str}
     }
 
 @router.post("/mark_bulk")
 async def mark_attendance_bulk(
-    timetable_entry_id: int,
+    timetable_entry_id: Optional[int] = None,
+    subject_id: Optional[int] = None,
+    section_id: Optional[int] = None,
     image: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    entry = db.query(models.TimetableEntry).filter(models.TimetableEntry.id == timetable_entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=400, detail="Invalid timetable entry")
+    entry = None
+    if timetable_entry_id:
+        entry = db.query(models.TimetableEntry).filter(models.TimetableEntry.id == timetable_entry_id).first()
         
+    if not entry and subject_id and section_id:
+        # Fallback 1: Find active timetable entry
+        entry = db.query(models.TimetableEntry).join(
+            models.TimetableVersion
+        ).filter(
+            models.TimetableVersion.status == "Active",
+            models.TimetableEntry.subject_id == subject_id,
+            models.TimetableEntry.section_id == section_id
+        ).first()
+        
+        # Fallback 2: Find any timetable entry
+        if not entry:
+            entry = db.query(models.TimetableEntry).filter(
+                models.TimetableEntry.subject_id == subject_id,
+                models.TimetableEntry.section_id == section_id
+            ).first()
+            
     contents = await image.read()
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -210,13 +255,13 @@ async def mark_attendance_bulk(
         # Check if already marked for THIS timetable entry today
         existing = db.query(models.Attendance).filter(
             models.Attendance.student_id == student_id,
-            models.Attendance.timetable_entry_id == timetable_entry_id,
+            models.Attendance.timetable_entry_id == (entry.id if entry else None),
             models.Attendance.date == today
         ).first()
         
         if not existing:
             attendance = models.Attendance(
-                timetable_entry_id=timetable_entry_id,
+                timetable_entry_id=entry.id if entry else None,
                 student_id=student_id,
                 date=today,
                 time=now.time(),

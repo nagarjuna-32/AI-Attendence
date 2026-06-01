@@ -69,6 +69,18 @@ export default function FacultyDashboard() {
           >
             Change Password
           </button>
+            <button 
+              onClick={() => navigate('/scanner')}
+              className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 px-4 py-2 rounded-lg border border-cyan-500/30 flex items-center justify-center gap-2 transition-all font-semibold"
+            >
+              <Camera size={16} /> Open Scanner
+            </button>
+            <button 
+              onClick={() => navigate('/faculty/bulk-scanner')}
+              className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-lg border border-emerald-500/30 flex items-center justify-center gap-2 transition-all font-semibold"
+            >
+              <Users size={16} /> Bulk Attendance
+            </button>
           <button 
             onClick={() => navigate('/faculty/alerts')}
             className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-4 py-1.5 rounded-lg border border-rose-500/30 flex items-center gap-2 transition-all font-semibold text-sm"
@@ -87,8 +99,8 @@ export default function FacultyDashboard() {
               {assignments.map(a => (
                 <div key={a.id} className="glass-card p-4 flex justify-between items-center">
                   <div>
-                    <h3 className="font-bold text-emerald-400">{a.subject_name} <span className="text-xs font-mono text-slate-400 ml-2 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">{a.subject_code}</span></h3>
-                    <p className="text-sm text-slate-400 mt-1">Class: {a.section_name} • Managed by HOD Timetable</p>
+                    <h3 className="font-bold text-emerald-400">{a.subject.name} <span className="text-xs font-mono text-slate-400 ml-2 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">{a.subject.code}</span></h3>
+                    <p className="text-sm text-slate-400 mt-1">Class: {a.section.name} • Managed by HOD Timetable</p>
                   </div>
                   <div className="flex flex-col gap-2">
                     <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded text-xs font-bold border border-emerald-500/30 text-center tracking-wider">
@@ -130,7 +142,7 @@ export default function FacultyDashboard() {
           </div>
         )}
 
-        <h2 className="text-xl font-bold mb-4">Your Assigned Subjects</h2>
+        <h2 className="text-xl font-bold mb-4">Academic Assignments</h2>
         
         {loading ? (
           <div className="text-center text-slate-400 py-8">Loading assignments...</div>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { API_BASE } from '../utils/api';
 import { Eye, EyeOff, ShieldCheck, Users, GraduationCap, BarChart3, ScanFace, ChevronLeft } from 'lucide-react';
@@ -7,8 +7,7 @@ import { Eye, EyeOff, ShieldCheck, Users, GraduationCap, BarChart3, ScanFace, Ch
 const roles = [
   { id: 'principal', label: 'Principal', icon: ShieldCheck, color: 'text-indigo-400' },
   { id: 'hod', label: 'HOD', icon: Users, color: 'text-emerald-400' },
-  { id: 'faculty', label: 'Faculty', icon: BarChart3, color: 'text-amber-400' },
-  { id: 'student', label: 'Student', icon: GraduationCap, color: 'text-cyan-400' }
+  { id: 'faculty', label: 'Faculty', icon: BarChart3, color: 'text-amber-400' }
 ];
 
 export default function Login() {
@@ -19,6 +18,13 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state && location.state.role) {
+      setActiveRole(location.state.role);
+    }
+  }, [location]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -37,19 +43,24 @@ export default function Login() {
       const data = await res.json();
       
       if (res.ok) {
+        const actualRole = data.role.toLowerCase();
+        
+        // Strictly enforce role tabs (unless admin)
+        if (actualRole !== 'admin' && actualRole !== activeRole) {
+          setError(`You are not registered as ${activeRole.toUpperCase()}.`);
+          return;
+        }
+
         localStorage.setItem('token', data.access_token);
         localStorage.setItem('role', data.role);
         localStorage.setItem('username', data.username || username);
         if (data.id) localStorage.setItem('user_id', data.id);
         
-        // Ensure the selected tab matches the actual DB role to avoid confusion
-        const actualRole = data.role.toLowerCase();
-        
-        if (actualRole === 'principal') navigate('/principal/dashboard');
-        else if (actualRole === 'hod') navigate('/hod/dashboard');
+        if (actualRole === 'principal') navigate('/principal');
+        else if (actualRole === 'hod') navigate('/hod');
         else if (actualRole === 'admin') navigate('/admin');
-        else if (actualRole === 'faculty') navigate('/faculty/dashboard');
-        else navigate('/student/dashboard');
+        else if (actualRole === 'faculty') navigate('/faculty');
+        else navigate('/student');
       } else {
         setError(data.detail || 'Authentication failed. Please check credentials.');
       }

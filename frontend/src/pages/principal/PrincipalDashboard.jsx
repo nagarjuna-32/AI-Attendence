@@ -32,6 +32,37 @@ export default function PrincipalDashboard() {
   const [selectedSection, setSelectedSection] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deptFaculty, setDeptFaculty] = useState([]);
+  const [deptStudents, setDeptStudents] = useState([]);
+  const [activeDirectoryTab, setActiveDirectoryTab] = useState('faculty'); // 'faculty' or 'student'
+
+  useEffect(() => {
+    const loadDeptFaculty = async () => {
+      try {
+        let url = '/faculty_mgmt/department';
+        if (selectedDept) url += `?department_id=${selectedDept}`;
+        const res = await fetchWithAuth(url);
+        if (res && res.ok) {
+          setDeptFaculty(await res.json());
+        }
+      } catch (err) {}
+    };
+    loadDeptFaculty();
+  }, [selectedDept]);
+
+  useEffect(() => {
+    const loadDeptStudents = async () => {
+      try {
+        let url = '/students/department';
+        if (selectedDept) url += `?department_id=${selectedDept}`;
+        const res = await fetchWithAuth(url);
+        if (res && res.ok) {
+          setDeptStudents(await res.json());
+        }
+      } catch (err) {}
+    };
+    loadDeptStudents();
+  }, [selectedDept]);
 
   useEffect(() => {
     const initLoad = async () => {
@@ -126,6 +157,18 @@ export default function PrincipalDashboard() {
       },
     ],
   };
+
+  const filteredFaculty = deptFaculty.filter(f => 
+    (f.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (f.faculty_id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (f.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredStudents = deptStudents.filter(s => 
+    (s.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.usn || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400">Loading Analytics...</div>;
 
@@ -360,6 +403,99 @@ export default function PrincipalDashboard() {
               className="glass-input !py-2"
             />
           </div>
+        </div>
+
+        {/* Department Directory (Viewable by Principal) */}
+        <div className="mb-8 glass-panel p-6 border-t-2 border-emerald-500/50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-700/50 pb-3 mb-6 gap-4">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+              <Users size={20} className="text-emerald-400" /> 
+              {selectedDept ? 'Department Roster' : 'All College Roster'}
+            </h2>
+            
+            <div className="flex bg-slate-950/60 p-1 rounded-xl border border-slate-800/80">
+              <button 
+                onClick={() => setActiveDirectoryTab('faculty')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeDirectoryTab === 'faculty' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Faculty ({filteredFaculty.length})
+              </button>
+              <button 
+                onClick={() => setActiveDirectoryTab('student')}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeDirectoryTab === 'student' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Students ({filteredStudents.length})
+              </button>
+            </div>
+          </div>
+          
+          {activeDirectoryTab === 'faculty' ? (
+            filteredFaculty.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm">No registered faculty members found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-950/40 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Name</th>
+                      <th className="py-3 px-4">Faculty ID</th>
+                      <th className="py-3 px-4">Department</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Designation</th>
+                      <th className="py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {filteredFaculty.map(f => (
+                      <tr key={f.id} className="hover:bg-slate-900/30 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-white">{f.name}</td>
+                        <td className="py-3.5 px-4 font-mono text-cyan-400 text-xs">{f.faculty_id}</td>
+                        <td className="py-3.5 px-4">{f.department}</td>
+                        <td className="py-3.5 px-4">{f.email}</td>
+                        <td className="py-3.5 px-4">{f.designation}</td>
+                        <td className="py-3.5 px-4">
+                          <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {f.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : (
+            filteredStudents.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 text-sm">No registered students found.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-950/40 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Name</th>
+                      <th className="py-3 px-4">USN</th>
+                      <th className="py-3 px-4">Semester</th>
+                      <th className="py-3 px-4">Section</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Registered Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {filteredStudents.map(s => (
+                      <tr key={s.id} className="hover:bg-slate-900/30 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-white">{s.name}</td>
+                        <td className="py-3.5 px-4 font-mono text-cyan-400 text-xs">{s.usn}</td>
+                        <td className="py-3.5 px-4">Semester {s.semester}</td>
+                        <td className="py-3.5 px-4">Section {s.section}</td>
+                        <td className="py-3.5 px-4">{s.email}</td>
+                        <td className="py-3.5 px-4 font-mono text-xs text-slate-400">{s.registered_at}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
         </div>
 
         {/* Filter Results & Charts */}
