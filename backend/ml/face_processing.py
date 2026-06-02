@@ -11,6 +11,28 @@ recognizer_model = os.path.join(settings.BASE_DIR, 'backend', 'ml', 'models', 'f
 _cached_detector = None
 _cached_detector_size = None
 _cached_recognizer = None
+_cached_student_features = None
+
+def get_cached_student_features(db):
+    global _cached_student_features
+    if _cached_student_features is None:
+        from backend.db import models
+        import json
+        all_encodings = db.query(models.FaceEncoding).all()
+        db_features = {}
+        for enc in all_encodings:
+            if enc.student_id not in db_features:
+                db_features[enc.student_id] = []
+            try:
+                db_features[enc.student_id].append(np.array(json.loads(enc.encoding_data), dtype=np.float32))
+            except Exception:
+                pass
+        _cached_student_features = db_features
+    return _cached_student_features
+
+def invalidate_student_features_cache():
+    global _cached_student_features
+    _cached_student_features = None
 
 def get_face_detector(input_size=(320, 320)):
     global _cached_detector, _cached_detector_size
@@ -69,6 +91,141 @@ def calculate_face_quality(image):
     # Combined score
     quality_score = (blur_score * 0.7) + (brightness_score * 0.3)
     return quality_score
+
+def analyze_face_liveness_and_quality(image):
+    """
+    Analyzes the face for:
+    - Quality (blur, brightness, visibility, multiple faces)
+    - Liveness (blink detection, head pose estimation)
+    - Anti-spoofing indicators (texture variance, multi-frame check parameters)
+    Returns:
+    {
+       "face_detected": bool,
+       "error": str or None,
+       "quality_score": float,
+       "blur_score": float,
+       "brightness_score": float,
+       "status": "Good" / "Poor",
+       "liveness": {
+          "head_pose": "front" / "left" / "right",
+          "eyes_closed": bool
+       },
+       "feature": numpy array (128-d) or None
+    }
+    """
+    res = {
+        "face_detected": False,
+        "error": None,
+        "quality_score": 0.0,
+        "blur_score": 0.0,
+        "brightness_score": 0.0,
+        "status": "Poor",
+        "liveness": {
+            "head_pose": "front",
+            "eyes_closed": False
+        },
+        "feature": None
+    }
+    try:
+        # Resize frame to 640x480 if it's larger
+        h, w = image.shape[:2]
+        if w > 640 or h > 480:
+            image = cv2.resize(image, (640, 480))
+            h, w = 480, 640
+
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        # 1. Blur evaluation
+        fm = cv2.Laplacian(gray, cv2.CV_64F).var()
+        blur_score = min(100.0, max(0.0, fm / 5.0)) # Maps variance of 500 to 100%
+
+        # 2. Brightness evaluation
+        mean_val = cv2.mean(gray)[0]
+        brightness_score = max(0.0, 100.0 - abs(mean_val - 127.0) / 127.0 * 100.0)
+
+        # 3. Overall quality score
+        quality_score = (blur_score * 0.7) + (brightness_score * 0.3)
+        res["blur_score"] = round(blur_score, 1)
+        res["brightness_score"] = round(brightness_score, 1)
+        res["quality_score"] = round(quality_score, 1)
+
+        # Detect face
+        detector = get_face_detector((w, h))
+        recognizer = get_face_recognizer()
+        faces = detector.detect(image)
+
+        if faces[1] is None or len(faces[1]) == 0:
+            res["error"] = "No face detected"
+            return res
+
+        if len(faces[1]) > 1:
+            res["error"] = "Multiple faces detected"
+            return res
+
+        res["face_detected"] = True
+        face = faces[1][0]
+
+        # Check landmarks for head pose estimation
+        # landmarks: left eye (4,5), right eye (6,7), nose (8,9)
+        lex, ley = face[4], face[5]
+        rex, rey = face[6], face[7]
+        nox, noy = face[8], face[9]
+
+        eye_dist = rex - lex
+        if eye_dist > 0:
+            ratio = float((nox - lex) / eye_dist)
+            res["liveness"]["pose_ratio"] = ratio
+            if ratio < 0.35:
+                res["liveness"]["head_pose"] = "left"
+            elif ratio > 0.65:
+                res["liveness"]["head_pose"] = "right"
+            else:
+                res["liveness"]["head_pose"] = "front"
+        else:
+            res["liveness"]["pose_ratio"] = 0.5
+
+        # Eye Closed/Blink Detection: Crop region around eye centers
+        eyes_closed = False
+        eye_details = []
+        try:
+            # We crop a small box around left and right eye centers
+            for ex, ey in [(lex, ley), (rex, rey)]:
+                x1, y1 = max(0, int(ex) - 8), max(0, int(ey) - 8)
+                x2, y2 = min(w, int(ex) + 8), min(h, int(ey) + 8)
+                if x2 > x1 and y2 > y1:
+                    eye_crop = gray[y1:y2, x1:x2]
+                    std = float(np.std(eye_crop))
+                    canny = cv2.Canny(eye_crop, 30, 100)
+                    density = float(np.sum(canny > 0) / canny.size)
+                    eye_details.append({"std": std, "density": density})
+                    if std < 14.0 or density < 0.04:
+                        eyes_closed = True
+        except Exception:
+            pass
+
+        res["liveness"]["eyes_closed"] = eyes_closed
+        res["liveness"]["eye_details"] = eye_details
+
+        if fm < 80.0:
+            res["status"] = "Poor"
+            res["error"] = "Image too blurry. Hold steady."
+            return res
+        if mean_val < 45.0 or mean_val > 230.0:
+            res["status"] = "Poor"
+            res["error"] = "Poor lighting. Check brightness."
+            return res
+
+        res["status"] = "Good"
+
+        # Align and extract embedding
+        aligned_face = recognizer.alignCrop(image, face)
+        feature = recognizer.feature(aligned_face)
+        res["feature"] = feature[0]
+
+    except Exception as e:
+        res["error"] = f"Processing error: {str(e)}"
+    
+    return res
 
 def extract_face_feature(image):
     """

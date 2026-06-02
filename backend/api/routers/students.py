@@ -116,6 +116,7 @@ async def register_student(
         db.add(encoding)
         
     db.commit()
+    face_processing.invalidate_student_features_cache()
     return student
 
 @router.get("/", response_model=List[schemas.StudentResponse])
