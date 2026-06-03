@@ -206,11 +206,11 @@ def analyze_face_liveness_and_quality(image):
         res["liveness"]["eyes_closed"] = eyes_closed
         res["liveness"]["eye_details"] = eye_details
 
-        if fm < 80.0:
+        if fm < 10.0:
             res["status"] = "Poor"
             res["error"] = "Image too blurry. Hold steady."
             return res
-        if mean_val < 45.0 or mean_val > 230.0:
+        if mean_val < 10.0 or mean_val > 250.0:
             res["status"] = "Poor"
             res["error"] = "Poor lighting. Check brightness."
             return res

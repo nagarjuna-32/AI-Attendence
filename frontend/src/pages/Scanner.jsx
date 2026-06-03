@@ -71,6 +71,7 @@ export default function Scanner() {
   const blinkStageRef = useRef(0);
   const isProcessingRef = useRef(false);
   const challengePassedRef = useRef(false);
+  const consecutiveUnknownCount = useRef(0);
   
   // Track active scanState inside refs to avoid closure issues in intervals
   const scanStateRef = useRef('initializing');
@@ -101,23 +102,6 @@ export default function Scanner() {
       stopCamera();
     };
   }, []);
-
-  // Countdown timer for scanning timeout
-  useEffect(() => {
-    if (scanState !== 'scanning') return;
-    if (scanTimeoutLeft <= 0) {
-      stopCamera();
-      setScanState('timeout');
-      return;
-    }
-    const timer = setInterval(() => {
-      setScanTimeoutLeft(prev => {
-        const next = prev - 0.1;
-        return next <= 0 ? 0 : Number(next.toFixed(1));
-      });
-    }, 100);
-    return () => clearInterval(timer);
-  }, [scanState, scanTimeoutLeft]);
 
   // Redirect countdown when success or duplicate is active
   useEffect(() => {
@@ -154,8 +138,8 @@ export default function Scanner() {
     setChallengeProgress('Waiting...');
     setSpoofRatios([]);
     setMatchedStudent(null);
-    setScanTimeoutLeft(5.0);
     setRedirectCountdown(3);
+    consecutiveUnknownCount.current = 0;
     
     // Reset state & variables
     setChecklist({
@@ -277,6 +261,22 @@ export default function Scanner() {
     const scoreStr = data.quality ? `${data.quality.score}%` : '95%';
     setStatus(`Face Quality: ${scoreStr} (Good)`);
 
+    // Handle unrecognized faces (unregistered student)
+    if (data.status === 'unknown') {
+      consecutiveUnknownCount.current++;
+      if (consecutiveUnknownCount.current >= 10) {
+        consecutiveUnknownCount.current = 0;
+        stopCamera();
+        navigate('/register', { state: { error: 'Face not registered. Please register your details below.' } });
+        return;
+      } else {
+        setStatus(`Face not recognized. Verifying registration... (${consecutiveUnknownCount.current}/10)`);
+        isProcessingRef.current = false;
+        setIsProcessing(false);
+        return;
+      }
+    }
+
     // Verify liveness content
     const liveness = data.liveness;
     if (!liveness) {
@@ -315,6 +315,7 @@ export default function Scanner() {
     let facultyName = '';
 
     if (data.status === 'success' && data.match) {
+      consecutiveUnknownCount.current = 0;
       matchFound = true;
       name = data.match.name;
       usn = data.match.usn;
@@ -487,12 +488,6 @@ export default function Scanner() {
         </div>
         
         <div className="flex items-center gap-4">
-          {scanState === 'scanning' && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-full text-slate-400 text-xs font-medium">
-              <span>Scan Timeout:</span>
-              <span className="text-cyan-400 font-mono font-bold animate-pulse">{scanTimeoutLeft}s</span>
-            </div>
-          )}
           <div className="flex items-center gap-3 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-sm font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             System Online
@@ -527,15 +522,7 @@ export default function Scanner() {
                   />
                   <canvas ref={canvasRef} className="hidden" />
 
-                  {/* Horizontal Timeout Progress Bar */}
-                  {scanState === 'scanning' && (
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-900/60 z-30">
-                      <div 
-                        className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 transition-all duration-100 shadow-[0_0_10px_rgba(34,211,238,0.7)]" 
-                        style={{ width: `${(scanTimeoutLeft / 5) * 100}%` }}
-                      />
-                    </div>
-                  )}
+
 
                   {/* Animated Scan Line */}
                   {scanState === 'scanning' && (

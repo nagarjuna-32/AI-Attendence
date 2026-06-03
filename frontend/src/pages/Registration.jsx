@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera as CameraIcon, CheckCircle2, ChevronRight, AlertCircle, ChevronLeft } from 'lucide-react';
 import { API_BASE } from '../utils/api';
 
 export default function Registration() {
+  const location = useLocation();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     full_name: '', usn: '', department: '', semester: '', section: '', email: '', phone: ''
@@ -14,7 +16,13 @@ export default function Registration() {
   const [imageUrls, setImageUrls] = useState([]);
   const [eyeVerified, setEyeVerified] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(location.state?.error || '');
+
+  useEffect(() => {
+    if (location.state?.error) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -119,7 +127,7 @@ export default function Registration() {
         }
       }, 'image/jpeg');
       captureCount.current++;
-    }, 600);
+    }, 1000);
   };
 
   const handleSubmit = async (e) => {
@@ -191,6 +199,12 @@ export default function Registration() {
                 onSubmit={(e) => { e.preventDefault(); setStep(2); }}
                 className="grid grid-cols-1 md:grid-cols-2 gap-4"
               >
+                {error && (
+                  <div className="md:col-span-2 bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-lg flex items-center gap-3 mb-2">
+                    <AlertCircle className="shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
                 <div className="md:col-span-2"><input type="text" placeholder="Full Name" required className="glass-input" value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} /></div>
                 <div><input type="text" placeholder="USN / Roll No" required className="glass-input" value={formData.usn} onChange={e => setFormData({...formData, usn: e.target.value})} /></div>
                 <div>

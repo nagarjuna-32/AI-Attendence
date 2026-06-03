@@ -52,7 +52,7 @@ async def register_student(
             continue
             
         quality_score = face_processing.calculate_face_quality(img)
-        if quality_score < 15.0:
+        if quality_score < 3.0:
             raise HTTPException(status_code=400, detail="One or more images are low quality or blurry. Please retake.")
             
         feature, _, err = face_processing.extract_face_feature(img)
