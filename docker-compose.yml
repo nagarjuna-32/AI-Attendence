@@ -1,0 +1,98 @@
+
+services:
+  # Database Service
+  attendance-db:
+    image: postgres:15-alpine
+    container_name: attendance-db
+    environment:
+      POSTGRES_DB: attendance_db
+      POSTGRES_USER: attendance_user
+      POSTGRES_PASSWORD: attendance_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance_user -d attendance_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Core Microservice (Handles CRUD, Auth, Timetables)
+  attendance-core:
+    build:
+      context: .
+      dockerfile: services/core/Dockerfile
+    container_name: attendance-core
+    environment:
+      - DATABASE_URL=postgresql://attendance_user:attendance_pass@attendance-db:5432/attendance_db
+      - SECRET_KEY=super_secret_key_for_development_only_12345
+    ports:
+      - "8001:8001"
+    depends_on:
+      attendance-db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+      - ./face_data:/app/face_data
+
+  # Face Recognition Microservice (Handles YuNet / SFace Matcher)
+  attendance-face-rec:
+    build:
+      context: .
+      dockerfile: services/face-rec/Dockerfile
+    container_name: attendance-face-rec
+    environment:
+      - DATABASE_URL=postgresql://attendance_user:attendance_pass@attendance-db:5432/attendance_db
+    ports:
+      - "8002:8002"
+    depends_on:
+      attendance-db:
+        condition: service_healthy
+    volumes:
+      - ./face_data:/app/face_data
+
+  # Analytics Microservice (Handles PDF/Excel Export & Predictions)
+  attendance-analytics:
+    build:
+      context: .
+      dockerfile: services/analytics/Dockerfile
+    container_name: attendance-analytics
+    environment:
+      - DATABASE_URL=postgresql://attendance_user:attendance_pass@attendance-db:5432/attendance_db
+    ports:
+      - "8003:8003"
+    depends_on:
+      attendance-db:
+        condition: service_healthy
+
+  # Alerts Microservice (Handles Shortages & Notifications)
+  attendance-alerts:
+    build:
+      context: .
+      dockerfile: services/notifications/Dockerfile
+    container_name: attendance-alerts
+    environment:
+      - DATABASE_URL=postgresql://attendance_user:attendance_pass@attendance-db:5432/attendance_db
+    ports:
+      - "8004:8004"
+    depends_on:
+      attendance-db:
+        condition: service_healthy
+
+  # API Gateway & React Frontend
+  attendance-gateway:
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
+    container_name: attendance-gateway
+    ports:
+      - "80:80"
+    depends_on:
+      - attendance-core
+      - attendance-face-rec
+      - attendance-analytics
+      - attendance-alerts
+
+volumes:
+  postgres_data:
