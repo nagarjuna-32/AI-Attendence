@@ -13,3 +13,5 @@ pydantic==2.6.3
 pydantic-settings==2.2.1
 psycopg2-binary==2.9.9
 bcrypt==4.0.1
+pytest==8.0.2
+httpx==0.26.0
