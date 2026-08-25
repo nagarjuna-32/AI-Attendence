@@ -303,42 +303,70 @@ Export:
 
 ---
 
-# 🚀 Installation
+# 🚀 Installation & Setup
 
-## Clone Repository
-
-```bash
-git clone https://github.com/nagarjuna-32/AI-Attendence.git
-cd AI-Attendence
-```
-
-## Backend
-
-```bash
-cd backend
-
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-pip install -r requirements.txt
-
-python create_admin.py
-
-uvicorn main:app --reload
-```
+## Prerequisites
+* **Docker** & **Docker Compose** (Recommended)
+* OR **Python 3.10+** & **Node.js 18+** (For local running)
 
 ---
 
-## Frontend
+## 🐳 Option 1: Docker Compose (Recommended)
 
+This compiles and runs the entire microservice ecosystem (PostgreSQL, Core Service, Face Recognition, Analytics, Alerts, and Nginx Gateway) automatically.
+
+### 1. Build and Start the Containers
 ```bash
-cd frontend_react
+docker compose up --build
+```
 
+### 2. Seed Database & Create Default Accounts
+Once all containers are running and healthy, open a new terminal window in the root directory and run the database seeder:
+```bash
+docker compose exec attendance-core python create_admin.py
+```
+This initializes the database schema and creates these default accounts:
+* **Principal**: Username: `principal` | Password: `principal123`
+* **HOD**: Username: `hod_cse` | Password: `hod123`
+* **Faculty**: Username: `faculty` | Password: `faculty123`
+* **Student**: Username: `student` | Password: `student123`
+
+### 3. Access the Application
+Open your browser and navigate to:
+👉 **`http://localhost`**
+
+---
+
+## 🐍 Option 2: Local Manual Setup (Without Docker)
+
+### 1. Backend Microservices
+Ensure you have `python3-venv` installed on your system. Navigate to the backend directory, activate a virtual environment, and install dependencies:
+```bash
+# Ubuntu/Debian setup
+sudo apt update && sudo apt install python3-venv python3-pip -y
+
+# Setup virtual environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Run database seeder (Default SQLite file will be created)
+python3 ../create_admin.py
+```
+To run the backend local microservices, run each command in a separate terminal:
+* **Core**: `uvicorn backend.main_core:app --host 0.0.0.0 --port 8001`
+* **Face Recognition**: `uvicorn backend.main_face_rec:app --host 0.0.0.0 --port 8002`
+* **Analytics**: `uvicorn backend.main_analytics:app --host 0.0.0.0 --port 8003`
+* **Alerts/Notifications**: `uvicorn backend.main_alerts:app --host 0.0.0.0 --port 8004`
+
+### 2. Frontend Development Server
+Navigate to the frontend React workspace:
+```bash
+cd services/frontend
 npm install
 npm run dev
 ```
+Your local UI will be serving at: **`http://localhost:5173`**
 
 ---
 
